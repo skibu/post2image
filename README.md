@@ -24,6 +24,11 @@ Caching of the tweet info is of course done.
 Was able to manually get convert a tweet to html and use headless browser to convert it an image. Lots more to do!!!
 
 ## Configuring Server
+Install chromedriver, which allows selenium to actually communicate with the browser.
+```
+sudo apt install chromium-chromedriver
+```
+
 Download code from github:
 ```
 git clone https://github.com/skibu/post2image.git
