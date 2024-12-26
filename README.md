@@ -22,3 +22,30 @@ Caching of the tweet info is of course done.
 ## Status
 
 Was able to manually get convert a tweet to html and use headless browser to convert it an image. Lots more to do!!!
+
+## Configuring Server
+Download code from github:
+```
+git clone https://github.com/skibu/post2image.git
+```
+
+Need to load in certain python libraries first.
+```
+# Because of version complications when loading Pillow might
+# need to first get proper version of libijpeg62 libs
+sudo apt install libjpeg62-turbo=1:2.0.6-4
+sudo apt install libjpeg62-turbo-dev=1:2.0.6-4
+
+# Image processing is done using Pillow (aka PIL)
+# Note that running pip via python3 to make sure using proper version
+python3 -m pip install --upgrade Pillow 
+
+# Using selenium to run headless browser that converts html to image
+# Note that running pip via python3 to make sure using proper version
+python3 -m pip install --upgrade selenium
+```
+
+To run:
+```
+python3 main.py
+```
