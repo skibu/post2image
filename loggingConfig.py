@@ -1,7 +1,7 @@
 import logging
 import os
 
-logging_dir = '/usr/local/post2image/logs/'
+logging_dir = './logs'
 log_format = '%(asctime)s.%(msecs)03d - %(levelname)s : %(message)s'
 date_format = '%m/%d/%y %H:%M:%S'
 
