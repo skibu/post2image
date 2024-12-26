@@ -30,7 +30,11 @@ def browser_init() -> None:
     # To run without actual displaying browser window
     options.add_argument('--headless=new')
 
-    _browser = webdriver.Chrome(options=options)
+    options.binary_location = '/usr/bin/chromium-browser'
+
+    service = webdriver.ChromeService(executable_path='/usr/bin/chromedriver')
+
+    _browser = webdriver.Chrome(service=service, options=options)
 
     # Note: Chrome only goes down to 400px or 500px width. To get skinnier post need to put the
     # post html within a <div style="max-width: 399px"> </div> block.
