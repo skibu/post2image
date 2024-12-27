@@ -7,8 +7,8 @@ def init_config():
     config = configparser.ConfigParser()
     config.read('config.ini')
 
-    http_port = config.get('HTTP', 'http_port', fallback=9080)
-    https_port = config.get('HTTP', 'https_port', fallback=9443)
+    http_port = config.getint('HTTP', 'http_port', fallback=9080)
+    https_port = config.getint('HTTP', 'https_port', fallback=9443)
     tweet = config.get('misc', 'tweet')
     chrome_web_browser = config.get('misc', 'chrome_web_browser', fallback=None)
     chrome_webdriver = config.get('misc', 'chrome_webdriver', fallback=None)
