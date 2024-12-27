@@ -19,7 +19,7 @@ def start_webserver():
 
 def run():
     # Get the html for the post specified by thw url
-    browser.browser_get('file:///Users/michaelsmith/PycharmProjects/post2image/tweet.html')
+    browser.browser_get(config_values['tweet'])
 
     # Save full screenshot for comparison for debugging
     browser.wait_till_loaded()

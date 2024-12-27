@@ -9,6 +9,7 @@ from selenium.common import NoSuchElementException
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
+from main import config_values
 
 logger = logging.getLogger()
 
@@ -30,11 +31,17 @@ def browser_init() -> None:
     # To run without actual displaying browser window
     options.add_argument('--headless=new')
 
-    options.binary_location = '/usr/bin/chromium-browser'
+    # If chrome_web_browser specified then use it. Otherwise uses selenium default value
+    if config_values['chrome_web_browser']:
+        options.binary_location = config_values['chrome_web_browser']
 
-    service = webdriver.ChromeService(executable_path='/usr/bin/chromedriver')
+    # If chrome_webdriver specified then use it. Otherwise uses selenium default value
+    if config_values['chrome_webdriver']:
+        service = webdriver.ChromeService(executable_path=config_values['chrome_webdriver'])
+    else:
+        service = None
 
-    _browser = webdriver.Chrome(service=service, options=options)
+    _browser = webdriver.Chrome(options=options, service=service)
 
     # Note: Chrome only goes down to 400px or 500px width. To get skinnier post need to put the
     # post html within a <div style="max-width: 399px"> </div> block.

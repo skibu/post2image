@@ -9,11 +9,17 @@ def init_config():
 
     http_port = config.get('HTTP', 'http_port', fallback=9080)
     https_port = config.get('HTTP', 'https_port', fallback=9443)
+    tweet = config.get('misc', 'tweet')
+    chrome_web_browser = config.get('misc', 'chrome_web_browser', fallback=None)
+    chrome_webdriver = config.get('misc', 'chrome_webdriver', fallback=None)
 
     # Return a dictionary with the retrieved values
     config_values = {
         'http_port': http_port,
-        'https_port': https_port
+        'https_port': https_port,
+        'tweet': tweet,
+        'chrome_web_browser': chrome_web_browser,
+        'chrome_webdriver': chrome_webdriver
     }
 
     return config_values
