@@ -1,6 +1,7 @@
 import logging
 import traceback
 from http.server import BaseHTTPRequestHandler
+import re
 
 import loggingConfig
 
@@ -10,6 +11,20 @@ logger = logging.getLogger()
 # Create separate logger for logging bad requests. This way they don't pollute the main log file
 logger_bad_requests = loggingConfig.setup_logger("bad_requests", 'bad_requests.log')
 logger_bad_requests.propagate = False
+
+
+def _parse_path(path: str, regex: str) -> object:
+    """
+    Converts path to user_name, post_id using the specified regular expression.
+    :param path:
+    :param regex:
+    :return: user_name, post_id
+    """
+    pattern = re.compile(regex)
+    groups = pattern.match(path).groups()
+    user_name = groups[0]
+    post_id = groups[1]
+    return user_name, post_id
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -41,30 +56,45 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _xitter_post(self, path: str) -> None:
         """
-        Handles Xitter post
+        Handles Xitter post. The form of the URL path is
+        /becauseberkeley/status/1865482308008255873
         :rtype: None
         :param path: the path of the URL that was used
         """
         print(f"Handling Xitter post: {path}")
-        self._text_response(f"Xitter post: {path}")
+
+        # Determine user_name and post_id from the path of the post
+        user_name, post_id = _parse_path(path, r"/(\S+)/status/(\S+)")
+
+        self._text_response(f"Xitter post: {path} for user_name={user_name} post_id={post_id}")
 
     def _bluesky_post(self, path: str) -> None:
         """
-        Handles Bluesky post
+        Handles Bluesky post. The form of the URL path is
+        /profile/gilduran.bsky.social/post/3lecu7abrlk2f
         :rtype: None
         :param path: the path of the URL that was used
         """
         print(f"Handling Bluesky post: {path}")
-        self._text_response(f"Bluesky post: {path}")
+
+        # Determine user_name and post_id from the path of the post
+        user_name, post_id = _parse_path(path, r"/profile/(\S+)/post/(\S+)")
+
+        self._text_response(f"Bluesky post: {path} for user_name={user_name} post_id={post_id}")
 
     def _threads_post(self, path: str) -> None:
         """
-        Handles Threads post
+        Handles Threads post. The form of the URL path is
+        /@lakota_man/post/DDXTHZ2Jr14/embed
         :rtype: None
         :param path: the path of the URL that was used
         """
         print(f"Handling Threads post: {path}")
-        self._text_response(f"Threads post: {path}")
+
+        # Determine user_name and post_id from the path of the post
+        user_name, post_id = _parse_path(path, r"/(\S+)/post/(\S+)/embed")
+
+        self._text_response(f"Threads post: {path} for user_name={user_name} post_id={post_id}")
 
     def _text_response(self, msg: str) -> None:
         """
