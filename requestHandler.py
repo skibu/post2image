@@ -4,6 +4,9 @@ from http.server import BaseHTTPRequestHandler
 import re
 
 import loggingConfig
+from bluesky import bluesky_post_regex, get_bluesky_post_html
+from threads import threads_post_regex, get_threads_post_html
+from twitter import get_twitter_post_html, twitter_post_regex
 
 # The root logger
 logger = logging.getLogger()
@@ -64,9 +67,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f"Handling Xitter post: {path}")
 
         # Determine user_name and post_id from the path of the post
-        user_name, post_id = _parse_path(path, r"/(\S+)/status/(\S+)")
+        user_name, post_id = _parse_path(path, twitter_post_regex())
 
-        self._text_response(f"Xitter post: {path} for user_name={user_name} post_id={post_id}")
+        html = get_twitter_post_html(user_name, post_id)
+
+        self._text_response(f'Xitter post: {path} for user_name={user_name} post_id={post_id} and html=\n{html}')
 
     def _bluesky_post(self, path: str) -> None:
         """
@@ -78,9 +83,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f"Handling Bluesky post: {path}")
 
         # Determine user_name and post_id from the path of the post
-        user_name, post_id = _parse_path(path, r"/profile/(\S+)/post/(\S+)")
+        user_name, post_id = _parse_path(path, bluesky_post_regex())
 
-        self._text_response(f"Bluesky post: {path} for user_name={user_name} post_id={post_id}")
+        html = get_bluesky_post_html(user_name, post_id)
+
+        self._text_response(f'Bluesky post: {path} for user_name={user_name} post_id={post_id} and html=\n{html}')
 
     def _threads_post(self, path: str) -> None:
         """
@@ -92,9 +99,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f"Handling Threads post: {path}")
 
         # Determine user_name and post_id from the path of the post
-        user_name, post_id = _parse_path(path, r"/(\S+)/post/(\S+)/embed")
+        user_name, post_id = _parse_path(path, threads_post_regex())
 
-        self._text_response(f"Threads post: {path} for user_name={user_name} post_id={post_id}")
+        html = get_threads_post_html(user_name, post_id)
+
+        self._text_response(f'Threads post: {path} for user_name={user_name} post_id={post_id} and html=\n{html}')
 
     def _text_response(self, msg: str) -> None:
         """
