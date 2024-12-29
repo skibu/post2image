@@ -47,21 +47,71 @@ class RequestHandler(BaseHTTPRequestHandler):
     _temp_html_file_name = 'tmp/post.html'
 
     def do_GET(self):
+        logger.info('==============================================')
+        logger.info(f'Handling post at path={self.path}')
+        print(f'Handling post at path={self.path}')
+
+        # FIXME just for debugging
+        print(f'headers=\n{self.headers}')
+        print(f'User-Agency={self.headers['User-Agent']}')
+
+        if self._is_crawler():
+            self._return_redirect_to_original_post()
+        else:
+            self._return_open_graph_card()
+
+    def _is_crawler(self):
+        """
+        Returns true if the User-Agency header indicates that the request was
+        for a crawler (that process Oopen Graph card) instead of directly from
+        a web browser.
+        :return: true if request was by a crawler
+        """
+        return 'Chrome' in self.headers['User-Agent']
+
+    def _return_redirect_to_original_post(self) -> None:
+        """
+        Sends back redirect to the original post path but using the original domain name.
+        This way the user goes to the post when they click on the link.
+        """
+        new_url = f'https://x.com{self.path}'
+        msg = f'Redirecting to {new_url}'
+
+        response_body = bytes(msg, 'utf-8')
+        self.send_response(302)
+        self.send_header('Location', new_url)
+        self.end_headers()
+        self.wfile.write(response_body)
+
+    def _return_open_graph_card(self):
         path = self.path
-        logger.info(f'Handling post at path={path}')
-        print(f'Handling post at path={path}')
 
         try:
             html = self._get_html(path)
             logger.info(f'Got html for path={path} html=\n{html}')
 
             self._write_html_to_tmp_file(html)
-
             screenshot = browser.get_screenshot_for_html(self._temp_file_url())
-
             self._erase_tmp_file()
+            screenshot.save("tmp/cached.png")
 
             # FIXME For now just return the html for the post
+            # Return the Open Graph card
+            card_html = f"""
+            <html>
+            <head>
+            <meta property="og:title" content="Title" />
+            <meta property="og:type" content="website" /> <!-- probably doesn't matter -->
+            <meta property="og:url" content="https://www.imdb.com/title/tt0117500/" />
+            <meta property="og:image" content="https://m.media-amazon.com/images/M/MV5BMTc2NTQ4MjcwOV5BMl5BanBnXkFtZTgwNDUxMjE3MjI@._V1_QL75_UX642_.jpg" />
+            <meta property="og:description" content="" />
+            <!-- <meta property="og:site_name" content="robotaxi.rodeo" /> -->
+            <!-- <meta property="og:image:width" content="200" /> -->
+            <!-- <meta property="og:image:height" content="200" /> -->
+            </head>
+            </html>
+            """
+
             return self._text_response(f'html=\n{html}')
         except Exception as e:
             msg = 'Exception for request ' + self.path + '\n' + traceback.format_exc()
