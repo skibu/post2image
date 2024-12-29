@@ -48,9 +48,34 @@ def browser_init() -> None:
     _browser.set_window_size(400, 1000)
 
 
-def browser_get(url) -> None:
+def get_screenshot_for_html(url: str) -> object:
     """
-    Gets the URL using the browser and waits till the post is fully loaded
+    Loads specified URL into the browser, takes a screenshot of it as a PNG,
+    and then returns a cropped version of the screenshot.
+    :param url:
+    :return:
+    """
+    # Load specified URL into the browser
+    load_url(url)
+
+    # Wait till html fully loaded, include javascript and iframes
+    wait_till_loaded()
+
+    # Take a screenshot of the url content, and then crop it
+    screenshot = get_screenshot()
+    cropped_screenshot = screenshot.crop(get_rect(screenshot))
+
+    # For debugging save the images
+    screenshot.save('tmp/image.png')
+    cropped_screenshot.save('tmp/cropped.png')
+
+    return cropped_screenshot
+
+
+def load_url(url) -> None:
+    """
+    Fetches the URL using the browser and waits till the post
+    (but not any iframe) is fully loaded
     :param url:
     :return:
     """
@@ -99,10 +124,10 @@ def get_post_element():
     except NoSuchElementException as e:
         try:
             # If twitter or bluesky post then want the iframe
-            print("There was no threads OuterContainer so returning iframe")
+            logger.info("There was no threads OuterContainer so returning iframe")
             return _browser.find_element(By.TAG_NAME, "iframe")
         except NoSuchElementException as e:
-            print(f"Could not find the html element for the post. {e.msg}")
+            logger.error(f"Could not find the html element for the post. {e.msg}")
             return None
 
 
@@ -120,7 +145,7 @@ def wait_till_loaded():
 
         # See if iframe is being used. If not then NoSuchElementException will occur
         iframe = _browser.find_element(By.TAG_NAME, "iframe")
-        print(f'iframe dom id = {iframe.get_dom_attribute("id")}')
+        logger.info(f'iframe dom id = {iframe.get_dom_attribute("id")}')
 
         # switch to selected iframe document so can see if its sub-elements are ready
         _browser.switch_to.frame(iframe)
@@ -138,10 +163,10 @@ def wait_till_loaded():
         # Switch back to the main frame so that subsequent software not confused
         _browser.switch_to.default_content()
 
-        print('The post is now fully loaded')
+        logger.info('The post is now fully loaded')
     except NoSuchElementException as e:
         # There was no iframe so done since the get() would have waited till page loaded
-        print("No iframe used so page must already be fully loaded")
+        logger.error("No iframe used so page must already be fully loaded")
         return
 
 
@@ -157,7 +182,7 @@ def get_rect(screenshot) -> object:
     wait_till_loaded()
 
     post_element = get_post_element()
-    print(f'post_element dom id = {post_element.get_dom_attribute("id")}')
+    logger.info(f'post_element dom id = {post_element.get_dom_attribute("id")}')
 
     # Determine dimensions of the element
     ratio = get_image_pixels_per_browser_pixel(screenshot)
