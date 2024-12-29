@@ -48,12 +48,12 @@ def browser_init() -> None:
     _browser.set_window_size(400, 1000)
 
 
-def get_screenshot_for_html(url: str) -> object:
+def get_screenshot_for_html(url: str) -> Image:
     """
     Loads specified URL into the browser, takes a screenshot of it as a PNG,
     and then returns a cropped version of the screenshot.
-    :param url:
-    :return:
+    :param url: url of the file containing the html that describes the post. Can be on localhost.
+    :return: resulting image
     """
     # Load specified URL into the browser
     load_url(url)
