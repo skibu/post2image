@@ -52,28 +52,38 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f'Handling post at path={self.path}')
 
         # FIXME just for debugging
-        print(f'headers=\n{self.headers}')
-        print(f'User-Agency={self.headers['User-Agent']}')
+        # print(f'headers=\n{self.headers}')
+        print(f'User-Agent={self.headers['User-Agent']}')
+        print(f'Referer={self.headers['Referer']}')
 
-        if self._is_crawler():
-            self._return_redirect_to_original_post()
-        else:
+        # If requestor is an open graph crawler then return the open graph card.
+        # Otherwise return a redirect to the original post.
+        if self._is_open_graph_crawler():
             self._return_open_graph_card()
+        else:
+            self._return_redirect_to_original_post()
 
-    def _is_crawler(self):
+    def _is_open_graph_crawler(self):
         """
-        Returns true if the User-Agency header indicates that the request was
-        for a crawler (that process Oopen Graph card) instead of directly from
+        Returns true if the User-Agency header indicates that the request was for an
+        Open Graph crawler (that process Oopen Graph card) instead of directly from
         a web browser.
+        Bluesky crawler has used user_agent of:
+          Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Bluesky Cardyb/1.1; +mailto:support@bsky.app) Chrome/W.X.Y.Z Safari/537.36
+          Mozilla/5.0 (compatible; OpenGraph.io/1.1; +https://opengraph.io/;) AppleWebKit/537.36 (KHTML, like Gecko)  Chrome/51.0.2704.103 Safari/537.36
         :return: true if request was by a crawler
         """
-        return 'Chrome' in self.headers['User-Agent']
+        user_agent = self.headers['User-Agent'].lower()
+        return ('OpenGraph'.lower() in user_agent or
+                'Bluesky Cardyb'.lower() in user_agent)
 
     def _return_redirect_to_original_post(self) -> None:
         """
         Sends back redirect to the original post path but using the original domain name.
         This way the user goes to the post when they click on the link.
         """
+        print("FIXME returning redirect to original post")
+
         new_url = f'https://x.com{self.path}'
         msg = f'Redirecting to {new_url}'
 
@@ -84,10 +94,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(response_body)
 
     def _return_open_graph_card(self):
+        print("FIXME returning open graph card")
         path = self.path
 
         try:
-            html = self._get_html(path)
+            html = self._get_html_for_post(path)
             logger.info(f'Got html for path={path} html=\n{html}')
 
             self._write_html_to_tmp_file(html)
@@ -95,24 +106,23 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._erase_tmp_file()
             screenshot.save("tmp/cached.png")
 
-            # FIXME For now just return the html for the post
             # Return the Open Graph card
             card_html = f"""
-            <html>
-            <head>
-            <meta property="og:title" content="Title" />
-            <meta property="og:type" content="website" /> <!-- probably doesn't matter -->
-            <meta property="og:url" content="https://www.imdb.com/title/tt0117500/" />
-            <meta property="og:image" content="https://m.media-amazon.com/images/M/MV5BMTc2NTQ4MjcwOV5BMl5BanBnXkFtZTgwNDUxMjE3MjI@._V1_QL75_UX642_.jpg" />
-            <meta property="og:description" content="" />
-            <!-- <meta property="og:site_name" content="robotaxi.rodeo" /> -->
-            <!-- <meta property="og:image:width" content="200" /> -->
-            <!-- <meta property="og:image:height" content="200" /> -->
-            </head>
-            </html>
-            """
+<html>
+<head>
+<meta property="og:title" content="Reposting via:" />
+<meta name="twitter:title" content="Reposting via:" /> 
+<meta property="og:description" content="" />
 
-            return self._text_response(f'html=\n{html}')
+<meta property="og:type" content="article" /> <!-- probably doesn't matter -->
+<meta property="og:url" content="https://www.imdb.com/title/tt0117500/" />
+<meta property="og:image" content="https://m.media-amazon.com/images/M/MV5BMTc2NTQ4MjcwOV5BMl5BanBnXkFtZTgwNDUxMjE3MjI@._V1_QL75_UX642_.jpg" />
+<meta property="og:image:width" content="200" />
+<meta property="og:image:height" content="200" />
+</head>
+</html>"""
+            print(f'opengraph html={card_html}')
+            return self._html_response(card_html)
         except Exception as e:
             msg = 'Exception for request ' + self.path + '\n' + traceback.format_exc()
             logger.error(msg)
@@ -149,7 +159,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         logger.info('Erasing temp file')
         os.remove(self._temp_html_file_name)
 
-    def _get_html(self, path: str) -> str:
+    def _get_html_for_post(self, path: str) -> str:
         """
         Gets the html that can render the specified post.
         Handle depending on which social media site the URL is for.
@@ -213,9 +223,22 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         return get_threads_post_html(user_name, post_id)
 
+    def _html_response(self, msg: str) -> None:
+        """
+        For sending back html response
+        :param msg:
+        """
+        response_body = bytes(msg, 'utf-8')
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'html')
+        self.send_header('Content-Length', str(len(response_body)))
+        self.end_headers()
+        self.wfile.write(response_body)
+
     def _text_response(self, msg: str) -> None:
         """
-        For sending back error message response
+        For sending back text response
         :param msg:
         """
         response_body = bytes(msg, 'utf-8')
