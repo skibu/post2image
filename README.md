@@ -41,9 +41,13 @@ Need to load in certain python libraries first.
 sudo apt install libjpeg62-turbo=1:2.0.6-4
 sudo apt install libjpeg62-turbo-dev=1:2.0.6-4
 
-# Image processing is done using Pillow (aka PIL)
 # Note that running pip via python3 to make sure using proper version
-python3 -m pip install --upgrade Pillow 
+
+# Image processing is done using Pillow (aka PIL)
+python3 -m pip install --upgrade Pillow
+
+# For more easily handling http requests
+python3 -m pip install requests
 
 # Using selenium to run headless browser that converts html to image
 # Note that running pip via python3 to make sure using proper version
