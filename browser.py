@@ -29,7 +29,7 @@ def browser_init() -> None:
     # to get rid of warning message at top of page
     options.add_experimental_option("excludeSwitches", ['enable-automation']);
     # To run without actual displaying browser window
-    options.add_argument('--headless=new')
+    # FIXME options.add_argument('--headless=new')
 
     # If chrome_web_browser specified then use it. Otherwise uses selenium default value
     if config_values['chrome_web_browser']:
@@ -45,7 +45,7 @@ def browser_init() -> None:
 
     # Note: Chrome only goes down to 400px or 500px width. To get skinnier post need to put the
     # post html within a <div style="max-width: 399px"> </div> block.
-    _browser.set_window_size(400, 1000)
+    _browser.set_window_size(600, 1000)
 
 
 def get_screenshot_for_html(url: str) -> Image:
@@ -55,21 +55,54 @@ def get_screenshot_for_html(url: str) -> Image:
     :param url: url of the file containing the html that describes the post. Can be on localhost.
     :return: resulting image
     """
+    logger.info(f'Loading headless browser using html in url={url}')
+
     # Load specified URL into the browser
     load_url(url)
 
     # Wait till html fully loaded, include javascript and iframes
+    logger.info(f'Waiting till html loaded...')
     wait_till_loaded()
-
-    # Take a screenshot of the url content, and then crop it
+    logger.info(f'html loaded so can now get screenshot of post')
+    # Take a screenshot of the url content
     screenshot = get_screenshot()
-    cropped_screenshot = screenshot.crop(get_rect(screenshot))
+    logger.info(f'Got screenshot {screenshot}')
 
-    # For debugging save the images
+    # Crop it to remove surrounding white space
+    rect = get_rect(screenshot)
+    cropped_screenshot = screenshot.crop(rect)
+
+    # FIXME For debugging save the images
     screenshot.save('tmp/image.png')
     cropped_screenshot.save('tmp/cropped.png')
 
-    return cropped_screenshot
+    properly_sized_image = get_properly_sized_image(cropped_screenshot)
+    return properly_sized_image
+
+
+def get_properly_sized_image(img: Image) -> Image:
+    desired_w = 1200
+    desired_h = 630
+    img_w, img_h = img.size
+    if img_h <= desired_h:
+        return img
+    else:
+        # Shrink the image so that height is at limit of desired_h
+        shrunken_size = round(img_w * (desired_h / img_h)), desired_h
+        img.thumbnail(shrunken_size, Image.Resampling.LANCZOS)
+
+        # Create background transparent image that is desired size
+        proper_img = Image.new(mode="RGBA",
+                               size=(desired_w, desired_h),
+                               color=(0, 0, 0, 0))
+
+        # Write the shrunken image onto the transparent background
+        img_w = img.width
+        offset = ((desired_w - img_w) // 2, 0)
+        proper_img.paste(img, offset)
+
+        # Return the shrunken image with transparent sides
+        return proper_img
 
 
 def load_url(url) -> None:
@@ -124,7 +157,7 @@ def get_post_element():
     except NoSuchElementException as e:
         try:
             # If twitter or bluesky post then want the iframe
-            logger.info("There was no threads OuterContainer so returning iframe")
+            logger.info("There was no Threads OuterContainer so returning iframe")
             return _browser.find_element(By.TAG_NAME, "iframe")
         except NoSuchElementException as e:
             logger.error(f"Could not find the html element for the post. {e.msg}")
@@ -134,38 +167,44 @@ def get_post_element():
 def wait_till_loaded():
     """
     Waits till the post html has been fully loaded.
+    First need to determine if the post uses an iframe. If it doesn't then the get()
+    will have made sure that the post is fully loaded, so all done. But if an iframe
+    exists then need to make sure that it has been loaded.
     :return:
     """
-    # First need to determine if the post uses an iframe. If it doesn't then the get()
-    # will have made sure that the post is fully loaded, so all done. But if an iframe
-    # exists then need to make sure that it has been loaded.
+    logger.info(f'Waiting till html fully loaded and rendered...')
+
     try:
         # Have find_element() return immediately
         _browser.implicitly_wait(0)
 
         # See if iframe is being used. If not then NoSuchElementException will occur
         iframe = _browser.find_element(By.TAG_NAME, "iframe")
-        logger.info(f'iframe dom id = {iframe.get_dom_attribute("id")}')
+        logger.info(f'iframe found. DOM id = {iframe.get_dom_attribute("id")}')
 
         # switch to selected iframe document so can see if its sub-elements are ready
         _browser.switch_to.frame(iframe)
 
-        # Find an element in  the iframe that will be displayed once iframe fully loaded.
+        # Find an element in the iframe that will be displayed once iframe fully loaded.
         # Since the elements in the frame might not have been loaded yet need to
         # give it a few seconds.
         _browser.implicitly_wait(5)
         element = _browser.find_element(By.TAG_NAME, 'div')
+        logger.info(f'Found div html element within the iframe. DOM id= {element.get_dom_attribute("id")}')
 
         # Wait until the element has actually been displayed
+        logger.info(f'Waiting for div element to be displayed...')
         wait = WebDriverWait(_browser, timeout=5)
         wait.until(lambda d: element.is_displayed())
+        logger.info(f'div element is now displayed...')
 
         # Switch back to the main frame so that subsequent software not confused
         _browser.switch_to.default_content()
 
         logger.info('The post is now fully loaded')
     except NoSuchElementException as e:
-        # There was no iframe so done since the get() would have waited till page loaded
+        # There was no iframe as part of the post rendering so done since the get()
+        # would have waited till page loaded
         logger.error("No iframe used so page must already be fully loaded")
         return
 
@@ -178,8 +217,11 @@ def get_rect(screenshot) -> object:
     :param screenshot:
     :return:
     """
+    logger.info(f'Getting rectangle of iframe...')
+
     # Make sure that post is first fully loaded
     wait_till_loaded()
+    logger.info(f'Waited till html was fully loaded')
 
     post_element = get_post_element()
     logger.info(f'post_element dom id = {post_element.get_dom_attribute("id")}')
@@ -192,4 +234,4 @@ def get_rect(screenshot) -> object:
     top = rect['y'] * ratio - 1
     bottom = top + (rect['height'] * ratio) + 2
 
-    return left, top, right, bottom
+    return round(left), round(top), round(right), round(bottom)
