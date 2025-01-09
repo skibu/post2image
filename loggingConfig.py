@@ -2,7 +2,8 @@ import logging
 import os
 
 logging_dir = './logs/'
-log_format = '%(asctime)s.%(msecs)03d - %(levelname)s : %(message)s'
+log_format = ('%(asctime)s.%(msecs)03d - %(levelname)s - ' 
+              '%(filename)s:%(lineno)d -  %(message)s')
 date_format = '%m/%d/%y %H:%M:%S'
 
 
@@ -25,4 +26,6 @@ def setup_logger(name, log_file, level=logging.INFO):
 
 # Create the main logger, which is the root logger since no name is given
 logger = setup_logger(None, 'post2image.log', level=logging.INFO)
+logger.info('========================================================================')
 logger.info('====================== Starting post2image =============================')
+logger.info('========================================================================')

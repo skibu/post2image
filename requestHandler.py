@@ -5,6 +5,10 @@ import traceback
 from http.server import BaseHTTPRequestHandler
 from http.server import ThreadingHTTPServer
 import re
+from io import BytesIO
+from socketserver import BaseServer
+
+from PIL import Image
 
 import browser
 import loggingConfig
@@ -19,6 +23,9 @@ logger = logging.getLogger()
 # Create separate logger for logging bad requests. This way they don't pollute the main log file
 logger_bad_requests = loggingConfig.setup_logger("bad_requests", 'bad_requests.log')
 logger_bad_requests.propagate = False
+
+# So can erase tmp file at startup
+_first_time = True
 
 
 def start_webserver():
@@ -43,18 +50,33 @@ def _parse_path(path: str, regex: str) -> object:
     return user_name, post_id
 
 
+# noinspection PyMethodMayBeStatic
 class RequestHandler(BaseHTTPRequestHandler):
     _temp_html_file_name = 'tmp/post.html'
+    _images_directory = 'images'
 
     def do_GET(self):
-        logger.info('==============================================')
-        logger.info(f'Handling post at path={self.path}')
-        print(f'Handling post at path={self.path}')
+        # If first time run then make sure there is no tmp file lying around from before.
+        # Wanted to put this into __init__ but then it was called for every request
+        global _first_time
+        if _first_time:
+            logger.info(f'First web request to process so initialing web server...')
+            self._erase_tmp_file()
+            _first_time = False
+
+        logger.info(f'============== Handling request for path={self.path} ==============')
+        print(f'Handling post for path={self.path}')
 
         # FIXME just for debugging
         # print(f'headers=\n{self.headers}')
         print(f'User-Agent={self.headers['User-Agent']}')
         print(f'Referer={self.headers['Referer']}')
+
+        # If getting image from cache, do so...
+        if self.path.startswith('/' + self._images_directory):
+            image_local_file_name = self.path[1:]  # remove the first slash
+            self._return_image(image_local_file_name)
+            return
 
         # If requestor is an open graph crawler then return the open graph card.
         # Otherwise return a redirect to the original post.
@@ -62,6 +84,34 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._return_open_graph_card()
         else:
             self._return_redirect_to_original_post()
+
+    def _return_image(self, local_file_name: str) -> None:
+        """
+        Returns image at local_file_name as an http response
+        :param local_file_name:
+        """
+        # Read in image from file
+        image = Image.open(local_file_name)
+
+        # Create the image response
+        self.send_response(200)
+        self.send_header('Content-Type', 'image/png')
+
+        # Return object as a PNG (though should already be a PNG)
+        img_bytes_io = BytesIO()
+        image.save(img_bytes_io, 'PNG')
+        img_bytes_io.seek(0)
+        img_bytes = img_bytes_io.read()
+
+        # Finish up the response headers
+        content_length = len(img_bytes)
+        self.send_header('Content-Length', str(content_length))
+        self.end_headers()
+
+        # Write out the body
+        self.wfile.write(img_bytes)
+
+        logger.info(f'Returned requested image {local_file_name}')
 
     def _is_open_graph_crawler(self):
         """
@@ -73,7 +123,9 @@ class RequestHandler(BaseHTTPRequestHandler):
           Mozilla/5.0 (compatible; OpenGraph.io/1.1; +https://opengraph.io/;) AppleWebKit/537.36 (KHTML, like Gecko)  Chrome/51.0.2704.103 Safari/537.36
         :return: true if request was by a crawler
         """
-        user_agent = self.headers['User-Agent'].lower()
+        user_agent = self.headers['User-Agent']
+        if user_agent:
+            user_agent = user_agent.lower()
         return ('OpenGraph'.lower() in user_agent or
                 'Bluesky Cardyb'.lower() in user_agent)
 
@@ -93,37 +145,61 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response_body)
 
-    def _return_open_graph_card(self):
-        print("FIXME returning open graph card")
-        path = self.path
+    def _image_file_name(self, path: str) -> str:
+        """
+        Converts the path into a hash that can be used as a filename. Since a hash
+        can be a negative value, the first char of the hash is trimmed.
+        :param path: source of hash
+        :return: file name of image associated with path
+        """
+        # Make sure the directory has been created
+        os.makedirs(self._images_directory, exist_ok=True)
 
+        return self._images_directory + '/' + str(hash(path))[1:] + '.png'
+
+    def _return_open_graph_card(self):
+        logger.info(f'Will be returning Open Graph card for path={self.path}')
+
+        path = self.path
         try:
+            # Get the html for rendering the post
             html = self._get_html_for_post(path)
-            logger.info(f'Got html for path={path} html=\n{html}')
+            if not html:
+                # This can happen when Twitter tries to get card before the url is correct.
+                # So it isn't truly an error to log.
+                logger.info(f'Could not get html for path={path} so returning error http response')
+                return self._error_response(f'Could not get html for path={path}')
+            logger.info(f'Obtained html for path={path} html=\n{html}')
 
             self._write_html_to_tmp_file(html)
-            screenshot = browser.get_screenshot_for_html(self._temp_file_url())
+            screenshot_image = browser.get_screenshot_for_html(self._temp_file_url())
             self._erase_tmp_file()
-            screenshot.save("tmp/cached.png")
+
+            # Save the image into the cache
+            image_local_file_name = self._image_file_name(path)
+            image_url = 'http://' + config_values['domain'] + '/' + image_local_file_name
+            screenshot_image.save(image_local_file_name)
+            logger.info(f'Stored image in cache as file {image_local_file_name}')
+
+            width, height = screenshot_image.size
 
             # Return the Open Graph card
             card_html = f"""
 <html>
 <head>
-<meta property="og:title" content="Reposting via:" />
-<meta name="twitter:title" content="Reposting via:" /> 
+<meta property="og:title" content="Reposted via " />
+<meta name="twitter:title" content="Reposted via " /> 
 <meta property="og:description" content="" />
 
-<meta property="og:type" content="article" /> <!-- probably doesn't matter -->
-<meta property="og:url" content="https://www.imdb.com/title/tt0117500/" />
-<meta property="og:image" content="https://m.media-amazon.com/images/M/MV5BMTc2NTQ4MjcwOV5BMl5BanBnXkFtZTgwNDUxMjE3MjI@._V1_QL75_UX642_.jpg" />
-<meta property="og:image:width" content="200" />
-<meta property="og:image:height" content="200" />
+<meta property="og:type" content="image" /> <!-- probably doesn't matter -->
+<meta property="og:image" content="{image_url}" />
+<meta property="og:image:width" content="{width}" />
+<meta property="og:image:height" content="{height}" />
 </head>
 </html>"""
             print(f'opengraph html={card_html}')
             return self._html_response(card_html)
-        except Exception as e:
+        except:
             msg = 'Exception for request ' + self.path + '\n' + traceback.format_exc()
             logger.error(msg)
             return self._error_response(msg)
@@ -139,25 +215,35 @@ class RequestHandler(BaseHTTPRequestHandler):
         can access the browser at a time
         :param html:
         """
-        logger.info('Writing html to tmp file...')
+        logger.info(f'Writing html to tmp file {self._temp_html_file_name} ...')
         f = None
         start = time.time()
         while not f:
             try:
                 f = open(self._temp_html_file_name, "x")
             except FileExistsError:
-                logger.info('NOTE: temp file already exists so waiting...')
-                time.sleep(0.1)
+                logger.info(f'NOTE: temp file {self._temp_html_file_name} already exists so waiting for '
+                            f'it to disappear, or for 10 secs...')
+                time.sleep(2.0)  # FIXME time.sleep(0.1)
                 if time.time() - start > 10.0:
                     f = open(self._temp_html_file_name, "w")
 
         f.write(html)
         f.close()
-        logger.info("Wrote html to tmp file")
+        logger.info(f'Wrote html to tmp file {self._temp_html_file_name}')
 
     def _erase_tmp_file(self) -> None:
-        logger.info('Erasing temp file')
-        os.remove(self._temp_html_file_name)
+        """
+        Erases the tmp file used to both store the html and to make sure that only single request
+        accesses the browser at a time. This should also be done at startup in case this program
+        terminated without cleaning up that file by erasing it.
+        :return:
+        """
+        logger.info(f'Erasing temp file {self._temp_html_file_name}')
+        try:
+            os.remove(self._temp_html_file_name)
+        except FileNotFoundError:
+            logger.info(f'There was no tmp file {self._temp_html_file_name} to erase')
 
     def _get_html_for_post(self, path: str) -> str:
         """
