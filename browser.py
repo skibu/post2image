@@ -8,6 +8,7 @@ from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.wait import WebDriverWait
 from main import config_values
 
@@ -90,7 +91,7 @@ def make_modifications() -> None:
             # But really want to make sure that the image has actually been loaded, which is_displayed()
             # does not indicate. Therefore execute javascript to determine if the html image element is "complete"
             while True:
-                complete = _browser.execute_script(f"return arguments[0].complete", image_element)
+                complete = _browser.execute_script("return arguments[0].complete", image_element)
                 if complete:
                     break
             logger.info(f'Image element now "complete", which means it has been fully loaded')
@@ -99,7 +100,44 @@ def make_modifications() -> None:
     _browser.switch_to.default_content()
 
 
-def get_screenshot_for_html(url: str) -> Image:
+def get_number_likes() -> Optional[int]:
+    """
+    Returns number of likes for a tweet. Determines the number by searching XPATH of html
+    for what *appears* to be number of likes.
+    :return: (int) number of likes, or None if cannot be determined
+    """
+    # The return value
+    number_likes = None
+
+    # Need to just look within the iframe
+    iframe = _browser.find_element(By.TAG_NAME, "iframe")
+    _browser.switch_to.frame(iframe)
+
+    # Find the html element that contains number of likes
+    xpath_str = '//article/div/a/div/span'
+    likes_span_element = _browser.find_element(By.XPATH, xpath_str)
+
+    if likes_span_element:
+        # Find the likes html <span> element
+        try:
+            likes_text = _browser.execute_script("return arguments[0].innerText", likes_span_element)
+            if likes_text:
+                try:
+                    number_likes = int(likes_text)
+                    logger.info(f'Found the likes element={number_likes}')
+                except ValueError:
+                    logger.error(f'Found likes text="{likes_text}" but that could not be converted to an integer')
+        except NoSuchElementException as e:
+            logger.info(f'Could not find the likes <span> element specified by XPATH={xpath_str}')
+
+    # Switch back to the main frame so that subsequent software not confused
+    _browser.switch_to.default_content()
+
+    # Could not determine number of likes
+    return number_likes
+
+
+def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
     """
     Loads specified URL into the browser, takes a screenshot of it as a PNG,
     and then returns a cropped version of the screenshot.
@@ -115,6 +153,9 @@ def get_screenshot_for_html(url: str) -> Image:
     logger.info(f'Waiting till html loaded...')
     wait_till_loaded()
     logger.info(f'html loaded so can now get screenshot of post')
+
+    # Determine how many likes there are
+    num_likes = get_number_likes()
 
     # If want to make any modifications to the html, do so now
     make_modifications()
@@ -132,7 +173,7 @@ def get_screenshot_for_html(url: str) -> Image:
     cropped_screenshot.save('tmp/cropped.png')
 
     properly_sized_image = get_properly_sized_image(cropped_screenshot)
-    return properly_sized_image
+    return properly_sized_image, num_likes
 
 
 def get_properly_sized_image(img: Image) -> Image:
@@ -197,7 +238,7 @@ def get_image_pixels_per_browser_pixel(image: Image):
     return image.size[0] / window_size['width']
 
 
-def get_post_element():
+def get_post_element() -> Optional[WebElement]:
     """
     Returns the html element, like a div or iframe, that defines the rectangle that the post is displayed within
     :return: the html element
@@ -219,7 +260,7 @@ def get_post_element():
             return None
 
 
-def wait_till_loaded():
+def wait_till_loaded() -> None:
     """
     Waits till the post html has been fully loaded.
     First need to determine if the post uses an iframe. If it doesn't then the get()
@@ -263,13 +304,13 @@ def wait_till_loaded():
         return
 
 
-def get_rect(screenshot) -> object:
+def get_rect(screenshot) -> tuple[int, int, int, int]:
     """
     Gets the rectangle of the iframe, including 1 px margin around it. The units are
     in screen pixels and can be used to crop screenshot image to just the iframe with
     small border.
     :param screenshot:
-    :return:
+    :return:left, top, right, bottom
     """
     logger.info(f'Getting rectangle of iframe...')
 

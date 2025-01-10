@@ -167,7 +167,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             logger.info(f'Obtained html for path={path} html=\n{html}')
 
             self._write_html_to_tmp_file(html)
-            screenshot_image = browser.get_screenshot_for_html(self._temp_file_url())
+            screenshot_image, num_likes = browser.get_screenshot_for_html(self._temp_file_url())
             self._erase_tmp_file()
 
             # Save the image into the cache
@@ -178,18 +178,19 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             width, height = screenshot_image.size
 
+            title = f'💙 {num_likes} - Reposted via '
+
             # Return the Open Graph card
             card_html = f"""
 <html>
 <head>
-<meta property="og:title" content="Reposted via " />
-<meta name="twitter:title" content="Reposted via " /> 
+<meta property="og:title" content="{title}" />
+<meta name="twitter:title" content="{title}" /> 
 <meta property="og:description" content="" />
-
 <meta property="og:type" content="image" /> <!-- probably doesn't matter -->
 <meta property="og:image" content="{image_url}" />
-<meta property="og:image:width" content="{width}" />
-<meta property="og:image:height" content="{height}" />
+<meta property="og:image:width" content="{width}" /> <!-- doesn't work on Bluesky et al -->
+<meta property="og:image:height" content="{height}" />  <!-- doesn't work on Bluesky et al -->
 </head>
 </html>"""
             print(f'opengraph html={card_html}')
