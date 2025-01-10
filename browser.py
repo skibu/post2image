@@ -306,23 +306,47 @@ def wait_till_loaded() -> None:
 
 def get_rect(screenshot) -> tuple[int, int, int, int]:
     """
-    Gets the rectangle of the iframe, including 1 px margin around it. The units are
+    Gets the rectangle of the important part of the post. Want to use least amount of height
+    possible since BlueSky uses fixed aspect ratio for Open Graph cards and if the post is too
+    tall then the image is shrunk down too much. The units are
     in screen pixels and can be used to crop screenshot image to just the iframe with
     small border.
     :param screenshot:
     :return:left, top, right, bottom
     """
-    logger.info(f'Getting rectangle of iframe...')
+    logger.info(f'Getting rectangle of important part of <article> tga...')
 
-    post_element = get_post_element()
-    logger.info(f'post_element dom id = {post_element.get_dom_attribute("id")}')
-
-    # Determine dimensions of the element
     ratio = get_image_pixels_per_browser_pixel(screenshot)
-    rect = post_element.rect
-    left = rect['x'] * ratio - 1
-    right = left + (rect['width'] * ratio) + 2
-    top = rect['y'] * ratio - 1
-    bottom = top + (rect['height'] * ratio) + 2
+    logger.info(f'Pixel ratio={ratio}')
 
+    # Determine the main <article> element
+    iframe = _browser.find_element(By.TAG_NAME, 'iframe')
+
+    # Determine left and right of the post
+    iframe_rect = iframe.rect
+    left = iframe_rect['x'] * ratio - 1
+    right = left + (iframe_rect['width'] * ratio) + 2
+
+    _browser.switch_to.frame(iframe)
+    article = _browser.find_element(By.TAG_NAME, 'article')
+    if article:
+        # Use first div in the article to get the top position
+        div = article.find_element(By.TAG_NAME, 'div')
+        top = (iframe_rect['y'] + div.location['y']) * ratio - 6
+
+        # Use time element to can cut off the post there since time and remaining info not important
+        time = article.find_element(By.TAG_NAME, 'time')
+        if time:
+            bottom = (iframe_rect['y'] + time.location['y']) * ratio - 10
+        else:
+            bottom = top + (article.rect['height'] * ratio) - 4
+    else:
+        # No <article> element so use size of iframe
+        top = iframe_rect['y'] * ratio
+        bottom = top + (iframe_rect['height'] * ratio)
+
+    # Switch back to the main frame so that subsequent software not confused
+    _browser.switch_to.default_content()
+
+    logger.info(f'crop rect is left={left}, top={top}, right={right}, bottom={bottom}')
     return round(left), round(top), round(right), round(bottom)
