@@ -37,20 +37,6 @@ def start_webserver():
     server.serve_forever()
 
 
-def _parse_path(path: str, regex: str) -> object:
-    """
-    Converts path to user_name, post_id using the specified regular expression.
-    :param path:
-    :param regex:
-    :return: user_name, post_id
-    """
-    pattern = re.compile(regex)
-    groups = pattern.match(path).groups()
-    user_name = groups[0]
-    post_id = groups[1]
-    return user_name, post_id
-
-
 # noinspection PyMethodMayBeStatic
 class RequestHandler(BaseHTTPRequestHandler):
     _temp_html_file_name = 'tmp/post.html'
@@ -276,6 +262,19 @@ class RequestHandler(BaseHTTPRequestHandler):
             logger_bad_requests.warn(f'{self.client_address[0]} : {msg}')
             return ''
 
+    def _parse_path(self, path: str, regex: str) -> tuple[str, str]:
+        """
+        Converts path to user_name, post_id using the specified regular expression.
+        :param path:
+        :param regex:
+        :return: user_name, post_id
+        """
+        pattern = re.compile(regex)
+        groups = pattern.match(path).groups()
+        user_name = groups[0]
+        post_id = groups[1]
+        return user_name, post_id
+
     def _xitter_post(self, path: str) -> str:
         """
         Handles Xitter post. The form of the URL path is
@@ -286,7 +285,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         logger.info(f"Handling Xitter post: {path}")
 
         # Determine user_name and post_id from the path of the post
-        user_name, post_id = _parse_path(path, twitter_post_regex())
+        user_name, post_id = self._parse_path(path, twitter_post_regex())
 
         return get_twitter_post_html(user_name, post_id)
 
@@ -300,7 +299,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         logger.info(f"Handling Bluesky post: {path}")
 
         # Determine user_name and post_id from the path of the post
-        user_name, post_id = _parse_path(path, bluesky_post_regex())
+        user_name, post_id = self._parse_path(path, bluesky_post_regex())
 
         return get_bluesky_post_html(user_name, post_id)
 
@@ -314,7 +313,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         logger.info(f"Handling Threads post: {path}")
 
         # Determine user_name and post_id from the path of the post
-        user_name, post_id = _parse_path(path, threads_post_regex())
+        user_name, post_id = self._parse_path(path, threads_post_regex())
 
         return get_threads_post_html(user_name, post_id)
 
