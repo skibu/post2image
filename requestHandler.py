@@ -129,7 +129,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         Sends back redirect to the original post path but using the original domain name.
         This way the user goes to the post when they click on the link.
         """
-        print("FIXME returning redirect to original post")
+        logger.info("Returning redirect to original post")
 
         new_url = f'https://x.com{self.path}'
         msg = f'Redirecting to {new_url}'
