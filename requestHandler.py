@@ -65,12 +65,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             _first_time = False
 
         logger.info(f'============== Handling request for path={self.path} ==============')
-        print(f'Handling post for path={self.path}')
-
-        # FIXME just for debugging
-        # print(f'headers=\n{self.headers}')
-        print(f'User-Agent={self.headers['User-Agent']}')
-        print(f'Referer={self.headers['Referer']}')
+        print(f'Handling post for path={self.path}')  # FIXME
 
         # If getting image from cache, do so...
         if self.path.startswith('/' + self._images_directory):

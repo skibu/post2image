@@ -13,6 +13,7 @@ from main import config_values
 
 logger = logging.getLogger()
 
+# The headless web browser that is used to render the html
 _browser: Optional[WebDriver] = None
 
 
@@ -48,6 +49,56 @@ def browser_init() -> None:
     _browser.set_window_size(600, 1000)
 
 
+def make_modifications() -> None:
+    """
+    Finds the X logo if it is a twitter post and replaces it with a funny old twitter logo.
+    Doesn't return until the logo, if found, has been fully replaced and displayed such that
+    screenshot can be taken.
+    """
+    # Need to just look within the iframe
+    iframe = _browser.find_element(By.TAG_NAME, "iframe")
+    _browser.switch_to.frame(iframe)
+
+    # Find the X logo if it is a twitter post. Then can replace it. There are several svg
+    # icons, but by using find_element() get the first one, which is the one desired. And
+    # note that there is a bug where can't just find a svg element using "svg". Instead, need
+    # to use *[name()='svg'] as described in https://www.inflectra.com/Support/KnowledgeBase/KB503.aspx
+    # And most useful XPath documentation is at https://www.w3schools.com/xml/xpath_syntax.asp
+    # switch to selected iframe document so can see if its sub-elements are ready
+    parent_of_svg_logo_element = _browser.find_element(By.XPATH, "//article/div//a/*[name()='svg']/..")
+    if parent_of_svg_logo_element:
+        # Replace the HTML of the <a> element with an image of dead twitter bird instead of the ugly X logo.
+        # Note: must use https since that is used for the rest of the page
+        logger.info(f'Found X logo (most likely) so will try to replace it with something better...')
+        image_html = ('<image src="https://robotaxi.news/wp-content/uploads/2025/01/dead_twitter.png" '
+                      'name="replacement_logo" width="41" height="38">')
+        _browser.execute_script(f"arguments[0].innerHTML = '{image_html}'", parent_of_svg_logo_element)
+        logger.info(f'Updated logo html')
+
+        # Wait for the image to be loaded
+        # Find an element in the iframe that will be displayed once iframe fully loaded.
+        # Since the elements in the frame might not have been loaded yet need to
+        # give it a few seconds.
+        _browser.implicitly_wait(5)
+        image_element = _browser.find_element(By.NAME, 'replacement_logo')
+        if image_element:
+            logger.info(f'Found the name=replacement_logo image element so will make sure it is displayed...')
+            wait = WebDriverWait(_browser, timeout=10)
+            wait.until(lambda d: image_element.is_displayed())
+            logger.info(f'Image element now displayed')
+
+            # But really want to make sure that the image has actually been loaded, which is_displayed()
+            # does not indicate. Therefore execute javascript to determine if the html image element is "complete"
+            while True:
+                complete = _browser.execute_script(f"return arguments[0].complete", image_element)
+                if complete:
+                    break
+            logger.info(f'Image element now "complete", which means it has been fully loaded')
+
+    # Switch back to the main frame so that subsequent software not confused
+    _browser.switch_to.default_content()
+
+
 def get_screenshot_for_html(url: str) -> Image:
     """
     Loads specified URL into the browser, takes a screenshot of it as a PNG,
@@ -64,6 +115,10 @@ def get_screenshot_for_html(url: str) -> Image:
     logger.info(f'Waiting till html loaded...')
     wait_till_loaded()
     logger.info(f'html loaded so can now get screenshot of post')
+
+    # If want to make any modifications to the html, do so now
+    make_modifications()
+
     # Take a screenshot of the url content
     screenshot = get_screenshot()
     logger.info(f'Got screenshot {screenshot}')
@@ -194,7 +249,7 @@ def wait_till_loaded():
 
         # Wait until the element has actually been displayed
         logger.info(f'Waiting for div element to be displayed...')
-        wait = WebDriverWait(_browser, timeout=5)
+        wait = WebDriverWait(_browser, timeout=10)
         wait.until(lambda d: element.is_displayed())
         logger.info(f'div element is now displayed...')
 
@@ -203,9 +258,8 @@ def wait_till_loaded():
 
         logger.info('The post is now fully loaded')
     except NoSuchElementException as e:
-        # There was no iframe as part of the post rendering so done since the get()
-        # would have waited till page loaded
-        logger.error("No iframe used so page must already be fully loaded")
+        # There was no iframe as part of the post rendering so can't wait
+        logger.info("No iframe used so page so cannot wait until loaded")
         return
 
 
@@ -218,10 +272,6 @@ def get_rect(screenshot) -> object:
     :return:
     """
     logger.info(f'Getting rectangle of iframe...')
-
-    # Make sure that post is first fully loaded
-    wait_till_loaded()
-    logger.info(f'Waited till html was fully loaded')
 
     post_element = get_post_element()
     logger.info(f'post_element dom id = {post_element.get_dom_attribute("id")}')
