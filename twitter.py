@@ -29,7 +29,9 @@ def get_twitter_post_html(user_name: str, post_id: str):
     # is nice for seeing context. But this takes extra vertical space so might want to set
     # this true.
     url = (f'https://publish.twitter.com/oembed?' +
-           f'url=https://twitter.com/{user_name}/status/{post_id}&hide_thread=false')
+           f'url=https://twitter.com/{user_name}/status/{post_id}')
+    url = url + '&hide_thread=false'
+    url = url + '&theme=dark'
 
     logger.info(f'Getting twitter html by getting url={url}')
     response = requests.get(url)
