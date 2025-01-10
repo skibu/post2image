@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler
 from http.server import ThreadingHTTPServer
 import re
 from io import BytesIO
-from socketserver import BaseServer
+from urllib.parse import urlparse
 
 from PIL import Image
 
@@ -16,6 +16,7 @@ from bluesky import bluesky_post_regex, get_bluesky_post_html
 from main import config_values
 from threads import threads_post_regex, get_threads_post_html
 from twitter import get_twitter_post_html, twitter_post_regex
+from stable_hash import stable_hash_str
 
 # The root logger
 logger = logging.getLogger()
@@ -65,7 +66,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             _first_time = False
 
         logger.info(f'============== Handling request for path={self.path} ==============')
-        print(f'Handling post for path={self.path}')  # FIXME
 
         # If getting image from cache, do so...
         if self.path.startswith('/' + self._images_directory):
@@ -150,12 +150,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         # Make sure the directory has been created
         os.makedirs(self._images_directory, exist_ok=True)
 
-        return self._images_directory + '/' + str(hash(path))[1:] + '.png'
+        return self._images_directory + '/' + stable_hash_str(path)[1:] + '.png'
 
     def _return_open_graph_card(self):
         logger.info(f'Will be returning Open Graph card for path={self.path}')
 
-        path = self.path
+        # Determine the path. If there is a query string represented by a '?' then trim it off
+        # so that it doesn't complicate things. This is important because sometimes post URLs
+        # will include a query string with superfluous info.
+        path = urlparse(self.path).path
+
         try:
             # Get the html for rendering the post
             html = self._get_html_for_post(path)
@@ -176,9 +180,18 @@ class RequestHandler(BaseHTTPRequestHandler):
             screenshot_image.save(image_local_file_name)
             logger.info(f'Stored image in cache as file {image_local_file_name}')
 
-            width, height = screenshot_image.size
+            # Generate the title to display. Currently Bluesky will output a title no matter what, so might
+            # as well make it useful. Bluesky also displays the domain name underneath. Therefore using
+            # 'Reposted via' as the title. And adding the number of likes if it is available. This is especially
+            # nice since trying to trim number of likes from the image of the post so that the image is not
+            # to tall.
+            title = 'Reposted via'
+            if num_likes:
+                title = f'💙 {num_likes} - ' + title
 
-            title = f'💙 {num_likes} - Reposted via '
+            # Determine the image size so that it can be returned in the link card (even though Bluesky
+            # currently doesn't use that info
+            width, height = screenshot_image.size
 
             # Return the Open Graph card
             card_html = f"""
