@@ -174,28 +174,36 @@ def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
 
 
 def _get_properly_sized_image(img: Image) -> Image:
+    """
+    When the important part of the screenshot of the post is generated, it won't have the ideal
+    aspect ratio. This can cause Bluesky in particular to display image with clipped off top and
+    bottom if the image to aspect ratio is too tall. And it can cut off the left and right sides
+    if aspect ratio is too wide. Therefore want to have the resulting image have the proper Bluesky
+    aspect ratio, and to do that can simply use the desired width of 1200 and desired height of 630.
+    :param img: the image of the post
+    :return: the image, but with width of 1200 and height of 630
+    """
     desired_w = 1200
     desired_h = 630
     img_w, img_h = img.size
-    if img_h <= desired_h:
-        return img
-    else:
-        # Shrink the image so that height is at limit of desired_h
+
+    # Shrink the image so that height is at limit of desired_h. Assuming that
+    # width will always be less than desired_w so not concerned about width.
+    if img_h > desired_h:
         shrunken_size = round(img_w * (desired_h / img_h)), desired_h
         img.thumbnail(shrunken_size, Image.Resampling.LANCZOS)
 
-        # Create background transparent image that is desired size
-        proper_img = Image.new(mode="RGBA",
-                               size=(desired_w, desired_h),
-                               color=(0, 0, 0, 0))
+    # Create background transparent image that is desired size
+    proper_img = Image.new(mode="RGBA",
+                           size=(desired_w, desired_h),
+                           color=(0, 0, 0, 0))
 
-        # Write the shrunken image onto the transparent background
-        img_w = img.width
-        offset = ((desired_w - img_w) // 2, 0)
-        proper_img.paste(img, offset)
+    # Write the shrunken image onto center of the transparent background
+    centering_offset = ((desired_w - img_w) // 2, (desired_h - img_h) // 2)
+    proper_img.paste(img, centering_offset)
 
-        # Return the shrunken image with transparent sides
-        return proper_img
+    # Return the shrunken image with transparent sides
+    return proper_img
 
 
 def _load_url(url) -> None:
