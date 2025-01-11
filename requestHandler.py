@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 import time
 import traceback
 from http.server import BaseHTTPRequestHandler
@@ -41,6 +42,7 @@ def start_webserver():
 class RequestHandler(BaseHTTPRequestHandler):
     _temp_html_file_name = 'tmp/post.html'
     _images_directory = 'images'
+    _cache_directory = 'cache'
 
     def do_GET(self):
         # If first time run then make sure there is no tmp file lying around from before.
@@ -138,15 +140,52 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         return self._images_directory + '/' + stable_hash_str(path)[1:] + '.png'
 
-    def _return_open_graph_card(self):
-        logger.info(f'Will be returning Open Graph card for path={self.path}')
+    def _get_cache_filename(self, path: str) -> str:
+        return self._cache_directory + '/' + stable_hash_str(path) + '_card.html'
 
+    def _get_card_from_cache(self, path: str) -> Optional[str]:
+        filename = self._get_cache_filename(path)
+
+        logger.info(f'Seeing if request path={path} is stored as cache file={filename}')
+        try:
+            f = open(filename, "r")
+            html = f.read()
+            f.close()
+            logger.info(f'For path={path} using cache file={filename} html=\n{html}')
+            return html
+        except FileNotFoundError as e:
+            # No cache file that could be opened
+            return None
+
+    def _put_card_into_cache(self, path: str, html: str) -> None:
+        # Make sure cache directory exists
+        os.makedirs(self._cache_directory, exist_ok=True)
+
+        # Store html into the file
+        filename = self._get_cache_filename(path)
+        try:
+            f = open(filename, "w")
+            f.write(html)
+            f.close()
+            logger.info(f'For path={path} cached into file={filename} html=\n{html}')
+        except FileNotFoundError as e:
+            logger.error(f'Could not write cache file {filename} {str(e)}')
+
+    def _return_open_graph_card(self) -> None:
         # Determine the path. If there is a query string represented by a '?' then trim it off
         # so that it doesn't complicate things. This is important because sometimes post URLs
         # will include a query string with superfluous info.
         path = urlparse(self.path).path
+        logger.info(f'Will be returning Open Graph card for path={path}')
 
         try:
+            # If cached card exists then return it
+            cached_card_html = self._get_card_from_cache(path)
+            if cached_card_html:
+                logger.info(f'returning cached opengraph card html=\n{cached_card_html}')
+                return self._html_response(cached_card_html)
+
+            # Cached card doesn't exist so create it
             # Get the html for rendering the post
             html = self._get_html_for_post(path)
             if not html:
@@ -173,7 +212,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             # to tall.
             title = 'Reposted via'
             if num_likes:
-                title = f'💙 {num_likes} - ' + title
+                title = f'&hearts; {num_likes} - ' + title
 
             # Determine the image size so that it can be returned in the link card (even though Bluesky
             # currently doesn't use that info
@@ -192,7 +231,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 <meta property="og:image:height" content="{height}" />  <!-- doesn't work on Bluesky et al -->
 </head>
 </html>"""
-            print(f'opengraph html={card_html}')
+
+            # Cache the card html in case accessed again
+            self._put_card_into_cache(path, card_html)
+
+            logger.info(f'returning opengraph card html={card_html}')
             return self._html_response(card_html)
         except:
             msg = 'Exception for request ' + self.path + '\n' + traceback.format_exc()

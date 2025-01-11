@@ -150,9 +150,7 @@ def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
     load_url(url)
 
     # Wait till html fully loaded, include javascript and iframes
-    logger.info(f'Waiting till html loaded...')
-    wait_till_loaded()
-    logger.info(f'html loaded so can now get screenshot of post')
+    wait_till_fully_loaded()
 
     # Determine how many likes there are
     num_likes = get_number_likes()
@@ -162,10 +160,9 @@ def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
 
     # Take a screenshot of the url content
     screenshot = get_screenshot()
-    logger.info(f'Got screenshot {screenshot}')
 
     # Crop it to remove surrounding white space
-    rect = get_rect(screenshot)
+    rect = determine_key_part_of_screenshot(screenshot)
     cropped_screenshot = screenshot.crop(rect)
 
     # FIXME For debugging save the images
@@ -217,6 +214,7 @@ def get_screenshot() -> Image:
     Takes screenshot of visible part of the browser window and returns it as a Pillow Image
     :return:
     """
+    logger.info(f'Taking screenshot...')
     png = _browser.get_screenshot_as_png()
     return Image.open(BytesIO(png))
 
@@ -260,7 +258,7 @@ def get_post_element() -> Optional[WebElement]:
             return None
 
 
-def wait_till_loaded() -> None:
+def wait_till_fully_loaded() -> None:
     """
     Waits till the post html has been fully loaded.
     First need to determine if the post uses an iframe. If it doesn't then the get()
@@ -271,12 +269,16 @@ def wait_till_loaded() -> None:
     logger.info(f'Waiting till html fully loaded and rendered...')
 
     try:
-        # Have find_element() return immediately
-        _browser.implicitly_wait(0)
+        # Have find_element() return after just 1 second when looking for iframe.
+        # Sometimes TTwitter posts might take a bit to convert to iframe. Therefore
+        # need to give some time. But don't want to wait too long because some
+        # non-Twitter posts might not use an iframe at all and don't want to wait
+        # too long for these.
+        _browser.implicitly_wait(1)
 
         # See if iframe is being used. If not then NoSuchElementException will occur
         iframe = _browser.find_element(By.TAG_NAME, "iframe")
-        logger.info(f'iframe found. DOM id = {iframe.get_dom_attribute("id")}')
+        logger.info(f'iframe found. DOM id={iframe.get_dom_attribute("id")}')
 
         # switch to selected iframe document so can see if its sub-elements are ready
         _browser.switch_to.frame(iframe)
@@ -294,17 +296,17 @@ def wait_till_loaded() -> None:
         wait.until(lambda d: element.is_displayed())
         logger.info(f'div element is now displayed...')
 
-        # Switch back to the main frame so that subsequent software not confused
-        _browser.switch_to.default_content()
-
         logger.info('The post is now fully loaded')
     except NoSuchElementException as e:
         # There was no iframe as part of the post rendering so can't wait
-        logger.info("No iframe used so page so cannot wait until loaded")
+        logger.error("No iframe used so page so cannot wait until loaded", e)
         return
+    finally:
+        # Switch back to the main frame so that subsequent software not confused
+        _browser.switch_to.default_content()
 
 
-def get_rect(screenshot) -> tuple[int, int, int, int]:
+def determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
     """
     Gets the rectangle of the important part of the post. Want to use least amount of height
     possible since BlueSky uses fixed aspect ratio for Open Graph cards and if the post is too
