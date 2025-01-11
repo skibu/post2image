@@ -130,15 +130,14 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _image_file_name(self, path: str) -> str:
         """
-        Converts the path into a hash that can be used as a filename. Since a hash
-        can be a negative value, the first char of the hash is trimmed.
+        Converts the path into a hash that can be used as a filename.
         :param path: source of hash
         :return: file name of image associated with path
         """
         # Make sure the directory has been created
         os.makedirs(self._images_directory, exist_ok=True)
 
-        return self._images_directory + '/' + stable_hash_str(path)[1:] + '.png'
+        return self._images_directory + '/' + stable_hash_str(path) + '.png'
 
     def _get_cache_filename(self, path: str) -> str:
         return self._cache_directory + '/' + stable_hash_str(path) + '_card.html'
