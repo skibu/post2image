@@ -2,8 +2,8 @@ import logging
 import os
 
 logging_dir = './logs/'
-log_format = ('%(asctime)s.%(msecs)03d - %(levelname)s - ' 
-              '%(filename)s:%(lineno)d -  %(message)s')
+log_format = ('%(asctime)s.%(msecs)03d-%(levelname)s-%(thread)d-' 
+              '%(filename)s:%(lineno)d: %(message)s')
 date_format = '%m/%d/%y %H:%M:%S'
 
 
