@@ -253,7 +253,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         can access the browser at a time
         :param html:
         """
-        logger.info(f'Writing html to tmp file {self._temp_html_file_name} ...')
+        logger.info(f'Will write html to tmp file {self._temp_html_file_name} once file freed up...')
         f = None
         start = time.time()
         while not f:
