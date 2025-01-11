@@ -222,6 +222,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             card_html = f"""
 <html>
 <head>
+<!-- OpenGraph card for post {path} -->
 <meta property="og:title" content="{title}" />
 <meta name="twitter:title" content="{title}" /> 
 <meta property="og:description" content="" />
