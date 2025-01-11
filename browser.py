@@ -193,11 +193,15 @@ def _get_properly_sized_image(img: Image) -> Image:
     if img_h > desired_h:
         shrunken_size = round(img_w * (desired_h / img_h)), desired_h
         img.thumbnail(shrunken_size, Image.Resampling.LANCZOS)
+        img_w, img_h = img.size
 
-    # Create background transparent image that is desired size
+    # Create background semi-transparent image that is desired size and the right color.
+    # Using values of 31 and transparency of 230 so that in Bluesky the background will
+    # simply blend in with the post. Originally thought wanted a low transparency but it
+    # turns out thee Bluesky background color is darker than want.
     proper_img = Image.new(mode="RGBA",
                            size=(desired_w, desired_h),
-                           color=(0, 0, 0, 0))
+                           color=(31, 31, 31, 230))
 
     # Write the shrunken image onto center of the transparent background
     centering_offset = ((desired_w - img_w) // 2, (desired_h - img_h) // 2)
