@@ -84,7 +84,8 @@ def _make_modifications() -> None:
         image_element = _browser.find_element(By.NAME, 'replacement_logo')
         if image_element:
             logger.info(f'Found the name=replacement_logo image element so will make sure it is displayed...')
-            wait = WebDriverWait(_browser, timeout=10)
+            # Found that got timeout with X for 10 secs so increased to 15 secs
+            wait = WebDriverWait(_browser, timeout=15)
             wait.until(lambda d: image_element.is_displayed())
             logger.info(f'Image element now displayed')
 
