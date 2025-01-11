@@ -18,7 +18,7 @@ logger = logging.getLogger()
 _browser: Optional[WebDriver] = None
 
 
-def browser_init() -> None:
+def _browser_init() -> None:
     """
     Initializes browser if haven't done so yet
     """
@@ -50,7 +50,7 @@ def browser_init() -> None:
     _browser.set_window_size(600, 1000)
 
 
-def make_modifications() -> None:
+def _make_modifications() -> None:
     """
     Finds the X logo if it is a twitter post and replaces it with a funny old twitter logo.
     Doesn't return until the logo, if found, has been fully replaced and displayed such that
@@ -100,7 +100,7 @@ def make_modifications() -> None:
     _browser.switch_to.default_content()
 
 
-def get_number_likes() -> Optional[int]:
+def _get_number_likes() -> Optional[int]:
     """
     Returns number of likes for a tweet. Determines the number by searching XPATH of html
     for what *appears* to be number of likes.
@@ -147,33 +147,33 @@ def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
     logger.info(f'Loading headless browser using html in url={url}')
 
     # Load specified URL into the browser
-    load_url(url)
+    _load_url(url)
 
     # Wait till html fully loaded, include javascript and iframes
-    wait_till_fully_loaded()
+    _wait_till_fully_loaded()
 
     # Determine how many likes there are
-    num_likes = get_number_likes()
+    num_likes = _get_number_likes()
 
     # If want to make any modifications to the html, do so now
-    make_modifications()
+    _make_modifications()
 
     # Take a screenshot of the url content
-    screenshot = get_screenshot()
+    screenshot = _get_screenshot()
 
     # Crop it to remove surrounding white space
-    rect = determine_key_part_of_screenshot(screenshot)
+    rect = _determine_key_part_of_screenshot(screenshot)
     cropped_screenshot = screenshot.crop(rect)
 
     # FIXME For debugging save the images
     screenshot.save('tmp/image.png')
     cropped_screenshot.save('tmp/cropped.png')
 
-    properly_sized_image = get_properly_sized_image(cropped_screenshot)
+    properly_sized_image = _get_properly_sized_image(cropped_screenshot)
     return properly_sized_image, num_likes
 
 
-def get_properly_sized_image(img: Image) -> Image:
+def _get_properly_sized_image(img: Image) -> Image:
     desired_w = 1200
     desired_h = 630
     img_w, img_h = img.size
@@ -198,18 +198,18 @@ def get_properly_sized_image(img: Image) -> Image:
         return proper_img
 
 
-def load_url(url) -> None:
+def _load_url(url) -> None:
     """
     Fetches the URL using the browser and waits till the post
     (but not any iframe) is fully loaded
     :param url:
     :return:
     """
-    browser_init()
+    _browser_init()
     _browser.get(url)
 
 
-def get_screenshot() -> Image:
+def _get_screenshot() -> Image:
     """
     Takes screenshot of visible part of the browser window and returns it as a Pillow Image
     :return:
@@ -219,7 +219,7 @@ def get_screenshot() -> Image:
     return Image.open(BytesIO(png))
 
 
-def get_image_pixels_per_browser_pixel(image: Image):
+def _get_image_pixels_per_browser_pixel(image: Image):
     """
     Pixels in browser are not the same as pixels for the screen or for a
     screenshot. Depends on display resolution. To determine the ratio
@@ -236,35 +236,13 @@ def get_image_pixels_per_browser_pixel(image: Image):
     return image.size[0] / window_size['width']
 
 
-def get_post_element() -> Optional[WebElement]:
-    """
-    Returns the html element, like a div or iframe, that defines the rectangle that the post is displayed within
-    :return: the html element
-    """
-    # Want find_element() to return immediately if the element can't be found. This way
-    # can handle posts from different social media systems
-    _browser.implicitly_wait(0)
-
-    # If threads then want the div with class "OuterContainer"
-    try:
-        return _browser.find_element(By.CLASS_NAME, "OuterContainer")
-    except NoSuchElementException as e:
-        try:
-            # If twitter or bluesky post then want the iframe
-            logger.info("There was no Threads OuterContainer so returning iframe")
-            return _browser.find_element(By.TAG_NAME, "iframe")
-        except NoSuchElementException as e:
-            logger.error(f"Could not find the html element for the post. {e.msg}")
-            return None
-
-
-def wait_till_fully_loaded() -> None:
+def _wait_till_fully_loaded() -> None:
     """
     Waits till the post html has been fully loaded.
     First need to determine if the post uses an iframe. If it doesn't then the get()
     will have made sure that the post is fully loaded, so all done. But if an iframe
     exists then need to make sure that it has been loaded.
-    :return:
+    :return:None
     """
     logger.info(f'Waiting till html fully loaded and rendered...')
 
@@ -306,7 +284,7 @@ def wait_till_fully_loaded() -> None:
         _browser.switch_to.default_content()
 
 
-def determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
+def _determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
     """
     Gets the rectangle of the important part of the post. Want to use least amount of height
     possible since BlueSky uses fixed aspect ratio for Open Graph cards and if the post is too
@@ -318,7 +296,7 @@ def determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
     """
     logger.info(f'Getting rectangle of important part of <article> tga...')
 
-    ratio = get_image_pixels_per_browser_pixel(screenshot)
+    ratio = _get_image_pixels_per_browser_pixel(screenshot)
     logger.info(f'Pixel ratio={ratio}')
 
     # Determine the main <article> element
