@@ -294,11 +294,9 @@ def _wait_till_fully_loaded() -> None:
 
 def _determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
     """
-    Gets the rectangle of the important part of the post. Want to use least amount of height
+    Gets the rectangle of the important part of the post. Want to use the least amount of height
     possible since BlueSky uses fixed aspect ratio for Open Graph cards and if the post is too
-    tall then the image is shrunk down too much. The units are
-    in screen pixels and can be used to crop screenshot image to just the iframe with
-    small border.
+    tall then the image is shrunk down too much. The units are in screen pixels
     :param screenshot:
     :return:left, top, right, bottom
     """
@@ -310,10 +308,11 @@ def _determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
     # Determine the main <article> element
     iframe = _browser.find_element(By.TAG_NAME, 'iframe')
 
-    # Determine left and right of the post
+    # Determine left and right of the post. Adjusting left and right slightly to
+    # not include the border, since it is visually distracting.
     iframe_rect = iframe.rect
-    left = iframe_rect['x'] * ratio - 1
-    right = left + (iframe_rect['width'] * ratio) + 2
+    left = iframe_rect['x'] * ratio + 2
+    right = left + (iframe_rect['width'] * ratio) - 4
 
     _browser.switch_to.frame(iframe)
     article = _browser.find_element(By.TAG_NAME, 'article')
