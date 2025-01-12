@@ -1,7 +1,7 @@
 # For using Chrome browser to convert complicated html to an image
 import logging
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Tuple, Any
 
 from PIL import Image
 from selenium import webdriver
@@ -101,6 +101,33 @@ def _make_modifications() -> None:
     _browser.switch_to.default_content()
 
 
+def _get_post_text() -> Optional[str]:
+    # The return value
+    post_text = None
+
+    # Need to just look within the iframe
+    iframe = _browser.find_element(By.TAG_NAME, "iframe")
+    _browser.switch_to.frame(iframe)
+
+    # Find the html element that contains text of the main post
+    xpath_str = '//article/div/div/span'
+    post_text_span_element = _browser.find_element(By.XPATH, xpath_str)
+    if post_text_span_element:
+        # Find the likes in the html <span> element
+        try:
+            post_text = _browser.execute_script("return arguments[0].innerText", post_text_span_element)
+            if post_text:
+                logger.info(f'Found post text={post_text}')
+        except NoSuchElementException as e:
+            logger.info(f'Could not find the post text <span> element specified by XPATH={xpath_str}')
+
+    # Switch back to the main frame so that subsequent software not confused
+    _browser.switch_to.default_content()
+
+    # Could not determine number of likes
+    return post_text
+
+
 def _get_number_likes() -> Optional[int]:
     """
     Returns number of likes for a tweet. Determines the number by searching XPATH of html
@@ -119,7 +146,7 @@ def _get_number_likes() -> Optional[int]:
     likes_span_element = _browser.find_element(By.XPATH, xpath_str)
 
     if likes_span_element:
-        # Find the likes html <span> element
+        # Find the likes in the html <span> element
         try:
             likes_text = _browser.execute_script("return arguments[0].innerText", likes_span_element)
             if likes_text:
@@ -138,12 +165,14 @@ def _get_number_likes() -> Optional[int]:
     return number_likes
 
 
-def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
+def get_screenshot_for_html(url: str) -> tuple[Image, float, int | None, str | None]:
     """
     Loads specified URL into the browser, takes a screenshot of it as a PNG,
     and then returns a cropped version of the screenshot.
+    The shrinkage is also returned so the caller can know how tiny the resulting text is and
+    whether one want to include the post's text as part of the description in the Open Graph card.
     :param url: url of the file containing the html that describes the post. Can be on localhost.
-    :return: resulting image
+    :return: properly_sized_image, shrinkage, num_likes, post_text
     """
     logger.info(f'Loading headless browser using html in url={url}')
 
@@ -156,6 +185,9 @@ def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
     # Determine how many likes there are
     num_likes = _get_number_likes()
 
+    # Determine post text in case want to display it via OpenGraph description
+    post_text = _get_post_text()
+
     # If want to make any modifications to the html, do so now
     _make_modifications()
 
@@ -165,13 +197,17 @@ def get_screenshot_for_html(url: str) -> tuple[Image, Optional[int]]:
     # Crop it to remove surrounding white space
     rect = _determine_key_part_of_screenshot(screenshot)
     cropped_screenshot = screenshot.crop(rect)
+    original_height = cropped_screenshot.height
 
     # FIXME For debugging save the images
     screenshot.save('tmp/image.png')
     cropped_screenshot.save('tmp/cropped.png')
 
     properly_sized_image = _get_properly_sized_image(cropped_screenshot)
-    return properly_sized_image, num_likes
+    return (properly_sized_image,
+            properly_sized_image.height / original_height,
+            num_likes,
+            post_text)
 
 
 def _get_properly_sized_image(img: Image) -> Image:

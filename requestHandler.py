@@ -195,7 +195,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             logger.info(f'Obtained html for path={path} html=\n{html}')
 
             self._write_html_to_tmp_file(html)
-            screenshot_image, num_likes = browser.get_screenshot_for_html(self._temp_file_url())
+            screenshot_image, shrinkage, num_likes, post_text = (
+                browser.get_screenshot_for_html(self._temp_file_url()))
             self._erase_tmp_file()
 
             # Save the image into the cache
@@ -209,9 +210,17 @@ class RequestHandler(BaseHTTPRequestHandler):
             # 'Reposted via' as the title. And adding the number of likes if it is available. This is especially
             # nice since trying to trim number of likes from the image of the post so that the image is not
             # to tall.
-            title = 'Reposted via'
-            if num_likes:
-                title = f'&hearts; {num_likes} - ' + title
+            title = f'{num_likes} &hearts; - Posted by @{self._get_user(path)}'
+
+            # Determine if should add description to Open Graph card. Should be added if the post image
+            # had to be shrunk significantly, possibly making the text hard to read. Turns out the images
+            # displayed on mobile app are super tiny, so hard to read below even 0.8 shrinkage.
+            logger.info(f'image shrinkage = {shrinkage} for path={path}')
+            if shrinkage < 0.8:
+                description = post_text
+                title = title + ':'
+            else:
+                description = ''
 
             # Determine the image size so that it can be returned in the link card (even though Bluesky
             # currently doesn't use that info
@@ -224,11 +233,12 @@ class RequestHandler(BaseHTTPRequestHandler):
 <!-- OpenGraph card for post {path} -->
 <meta property="og:title" content="{title}" />
 <meta name="twitter:title" content="{title}" /> 
-<meta property="og:description" content="" />
-<meta property="og:type" content="image" /> <!-- probably doesn't matter -->
+<meta property="og:description" content="{description}" />
 <meta property="og:image" content="{image_url}" />
-<meta property="og:image:width" content="{width}" /> <!-- doesn't work on Bluesky et al -->
-<meta property="og:image:height" content="{height}" />  <!-- doesn't work on Bluesky et al -->
+ <!-- doesn't work on Bluesky et al so not truly needed-->
+<meta property="og:type" content="image" />
+<meta property="og:image:width" content="{width}" />
+<meta property="og:image:height" content="{height}" />
 </head>
 </html>"""
 
@@ -304,6 +314,31 @@ class RequestHandler(BaseHTTPRequestHandler):
             msg = f'Not a valid post "{self.path}"'
             logger_bad_requests.warn(f'{self.client_address[0]} : {msg}')
             return ''
+
+    def _get_user(self, path: str) -> Optional[str]:
+        """
+        Determines and returns the username from the path. Handles Bluesky, Xitter, and Threads URLs
+
+        Xitter post URL is like https://x.com/becauseberkeley/status/1865482308008255873
+        Bluesky post URL is like https://bsky.app/profile/skibu.bsky.social/post/3lcmchch6js2j
+        Threads post URL is like https://www.threads.net/@lakota_man/post/DDXTHZ2Jr14
+        :param path: the original URL path of the post
+        :return: username of post
+        """
+        if "/status/" in path:
+            # Xitter path like "/becauseberkeley/status/1865482308008255873"
+            return path[1:path.find('/', 1)]
+        elif "/profile/" in path and "/post/" in path:
+            # Bluesky path like "/profile/skibu.bsky.social/post/3lcmchch6js2j"
+            return path[10:path.find('/', 10)]
+        elif "/@" in path and "/post/" in path:
+            # Threads pass like /@lakota_man/post/DDXTHZ2Jr14
+            return path[2:path.find('/', 2)]
+        else:
+            # In case unknown command specified
+            msg = f'Not a valid post path "{self.path}"'
+            logger_bad_requests.warn(f'{self.client_address[0]} : {msg}')
+            return None
 
     def _parse_path(self, path: str, regex: str) -> tuple[str, str]:
         """
