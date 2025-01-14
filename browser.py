@@ -278,7 +278,7 @@ def _wait_till_fully_loaded() -> None:
 
         # See if iframe is being used. If not then NoSuchElementException will occur
         iframe = _browser.find_element(By.TAG_NAME, "iframe")
-        logger.info(f'iframe found. DOM id={iframe.get_dom_attribute("id")}')
+        logger.info(f'An iframe html element found')
 
         # switch to selected iframe document so can see if its sub-elements are ready
         _browser.switch_to.frame(iframe)
@@ -288,7 +288,7 @@ def _wait_till_fully_loaded() -> None:
         # give it a few seconds.
         _browser.implicitly_wait(5)
         element = _browser.find_element(By.TAG_NAME, 'div')
-        logger.info(f'Found div html element within the iframe. DOM id= {element.get_dom_attribute("id")}')
+        logger.info(f'Found a div html element within the iframe. DOM id= {element.get_dom_attribute("id")}')
 
         # Wait until the element has actually been displayed
         logger.info(f'Waiting for div element to be displayed...')
