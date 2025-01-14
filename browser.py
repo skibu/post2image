@@ -1,7 +1,7 @@
 # For using Chrome browser to convert complicated html to an image
 import logging
 from io import BytesIO
-from typing import Optional, Tuple, Any
+from typing import Optional
 
 from PIL import Image
 from selenium import webdriver
@@ -35,7 +35,7 @@ def _browser_init() -> None:
     # to get rid of warning message at top of page
     options.add_experimental_option("excludeSwitches", ['enable-automation']);
     # To run without actual displaying browser window
-    # FIXME options.add_argument('--headless=new')
+    options.add_argument('--headless=new')
 
     # If chrome_web_browser specified then use it. Otherwise uses selenium default value
     if config_values['chrome_web_browser']:
