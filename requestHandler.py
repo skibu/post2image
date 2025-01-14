@@ -8,9 +8,9 @@ from http.server import ThreadingHTTPServer
 import re
 from io import BytesIO
 from urllib.parse import urlparse
-
 from PIL import Image
 
+from browserType import PostType
 import browser
 import loggingConfig
 from bluesky import bluesky_post_regex, get_bluesky_post_html
@@ -53,7 +53,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._erase_tmp_file()
             _first_time = False
 
-        logger.info(f'============== Handling request for path={self.path} ==============')
+        logger.info(f'================ Handling request for path={self.path} ================')
 
         # If getting image from cache, do so...
         if self.path.startswith('/' + self._images_directory):
@@ -170,6 +170,25 @@ class RequestHandler(BaseHTTPRequestHandler):
         except FileNotFoundError as e:
             logger.error(f'Could not write cache file {filename} {str(e)}')
 
+    def _get_post_type(self, path: str) -> PostType:
+        """
+        Gets the html that can render the specified post.
+        Handle depending on which social media site the URL is for.
+        Xitter post URL is like https://x.com/becauseberkeley/status/1865482308008255873
+        Bluesky post URL is like https://bsky.app/profile/skibu.bsky.social/post/3lcmchch6js2j
+        Threads post URL is like https://www.threads.net/@lakota_man/post/DDXTHZ2Jr14
+        :param path: the path of the url used
+        :return: the post type of BLUESKY, XITTER, or THREADS (or UNKNOWN)
+        """
+        if "/status/" in path:
+            return PostType.XITTER
+        elif "/profile/" in path and "/post/" in path:
+            return PostType.BLUESKY
+        elif "/@" in path and "/post/" in path:
+            return PostType.THREADS
+        else:
+            return PostType.UNKNOWN
+
     def _return_open_graph_card(self) -> None:
         # Determine the path. If there is a query string represented by a '?' then trim it off
         # so that it doesn't complicate things. This is important because sometimes post URLs
@@ -186,7 +205,8 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             # Cached card doesn't exist so create it
             # Get the html for rendering the post
-            html = self._get_html_for_post(path)
+            post_type = self._get_post_type(path)
+            html = self._get_html_for_post(path, post_type)
             if not html:
                 # This can happen when Twitter tries to get card before the url is correct.
                 # So it isn't truly an error to log.
@@ -195,8 +215,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             logger.info(f'Obtained html for path={path} html=\n{html}')
 
             self._write_html_to_tmp_file(html)
-            screenshot_image, shrinkage, num_likes, post_text = (
-                browser.get_screenshot_for_html(self._temp_file_url()))
+            screenshot_image, shrinkage, likes_str, post_text = (
+                browser.get_screenshot_for_html(self._temp_file_url(), post_type))
             self._erase_tmp_file()
 
             # Save the image into the cache
@@ -210,7 +230,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             # 'Reposted via' as the title. And adding the number of likes if it is available. This is especially
             # nice since trying to trim number of likes from the image of the post so that the image is not
             # to tall.
-            title = f'{num_likes} &hearts; - Posted by @{self._get_user(path)}'
+            title = f'{likes_str} - Posted by @{self._get_user(path)}'
 
             # Determine if should add description to Open Graph card. Should be added if the post image
             # had to be shrunk significantly, possibly making the text hard to read. Turns out the images
@@ -293,27 +313,26 @@ class RequestHandler(BaseHTTPRequestHandler):
         except FileNotFoundError:
             logger.info(f'There was no tmp file {self._temp_html_file_name} to erase')
 
-    def _get_html_for_post(self, path: str) -> str:
+    def _get_html_for_post(self, path: str, post_type: PostType) -> str:
         """
         Gets the html that can render the specified post.
         Handle depending on which social media site the URL is for.
-        Xitter post URL is like https://x.com/becauseberkeley/status/1865482308008255873
-        Bluesky post URL is like https://bsky.app/profile/skibu.bsky.social/post/3lcmchch6js2j
-        Threads post URL is like https://www.threads.net/@lakota_man/post/DDXTHZ2Jr14
         :param path: the path of the url used to get here
+        :param post_type: PostType indicating whether xitter, bluesky, or threads post
         :return: the html to render the post
         """
-        if "/status/" in path:
-            return self._xitter_post(path)
-        elif "/profile/" in path and "/post/" in path:
-            return self._bluesky_post(path)
-        elif "/@" in path and "/post/" in path:
-            return self._threads_post(path)
-        else:
-            # In case unknown command specified
-            msg = f'Not a valid post "{self.path}"'
-            logger_bad_requests.warn(f'{self.client_address[0]} : {msg}')
-            return ''
+        match post_type:
+            case PostType.XITTER:
+                return self._xitter_post(path)
+            case PostType.BLUESKY:
+                return self._bluesky_post(path)
+            case PostType.THREADS:
+                return self._threads_post(path)
+            case _:
+                # In case unknown command specified
+                msg = f'Not a post that can be handled:"{self.path}"'
+                logger_bad_requests.warn(f'{self.client_address[0]} : {msg}')
+                return ''
 
     def _get_user(self, path: str) -> Optional[str]:
         """
@@ -357,8 +376,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         """
         Handles Xitter post. The form of the URL path is
         /becauseberkeley/status/1865482308008255873
-        :rtype: None
         :param path: the path of the URL that was used
+        :return html that can be used by browser to render a tweet
         """
         logger.info(f"Handling Xitter post: {path}")
 

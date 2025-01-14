@@ -8,9 +8,13 @@ from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.wait import WebDriverWait
+
+from bluesky import get_bluesky_likes_str, get_bluesky_post_text, get_bluesky_rect
 from main import config_values
+from browserType import PostType
+from threads import get_threads_likes_str, get_threads_post_text, get_threads_rect
+from twitter import get_twitter_likes_str, get_twitter_post_text, get_twitter_rect
 
 logger = logging.getLogger()
 
@@ -50,12 +54,15 @@ def _browser_init() -> None:
     _browser.set_window_size(600, 1000)
 
 
-def _make_modifications() -> None:
+def _make_modifications(post_type: PostType) -> None:
     """
     Finds the X logo if it is a twitter post and replaces it with a funny old twitter logo.
     Doesn't return until the logo, if found, has been fully replaced and displayed such that
-    screenshot can be taken.
+    screenshot can be taken. If not a twitter post then simpily returns
     """
+    if post_type != PostType.XITTER:
+        return
+
     # Need to just look within the iframe
     iframe = _browser.find_element(By.TAG_NAME, "iframe")
     _browser.switch_to.frame(iframe)
@@ -101,78 +108,44 @@ def _make_modifications() -> None:
     _browser.switch_to.default_content()
 
 
-def _get_post_text() -> Optional[str]:
-    # The return value
-    post_text = None
-
-    # Need to just look within the iframe
-    iframe = _browser.find_element(By.TAG_NAME, "iframe")
-    _browser.switch_to.frame(iframe)
-
-    # Find the html element that contains text of the main post
-    xpath_str = '//article/div/div/span'
-    post_text_span_element = _browser.find_element(By.XPATH, xpath_str)
-    if post_text_span_element:
-        # Find the likes in the html <span> element
-        try:
-            post_text = _browser.execute_script("return arguments[0].innerText", post_text_span_element)
-            if post_text:
-                logger.info(f'Found post text={post_text}')
-        except NoSuchElementException as e:
-            logger.info(f'Could not find the post text <span> element specified by XPATH={xpath_str}')
-
-    # Switch back to the main frame so that subsequent software not confused
-    _browser.switch_to.default_content()
-
-    # Could not determine number of likes
-    return post_text
+def _get_post_text(post_type: PostType) -> str:
+    match post_type:
+        case PostType.XITTER:
+            return get_twitter_post_text(_browser)
+        case PostType.BLUESKY:
+            return get_bluesky_post_text(_browser)
+        case PostType.THREADS:
+            return get_threads_post_text(_browser)
+        case _:
+            return ''
 
 
-def _get_number_likes() -> Optional[int]:
+def _get_likes_str(post_type: PostType) -> str:
     """
-    Returns number of likes for a tweet. Determines the number by searching XPATH of html
-    for what *appears* to be number of likes.
-    :return: (int) number of likes, or None if cannot be determined
+    Examines the HTML and returns string to be displayed showing number of likes.
+    :param post_type:
+    :return: string that can be displayed indicating number of likes
     """
-    # The return value
-    number_likes = None
-
-    # Need to just look within the iframe
-    iframe = _browser.find_element(By.TAG_NAME, "iframe")
-    _browser.switch_to.frame(iframe)
-
-    # Find the html element that contains number of likes
-    xpath_str = '//article/div/a/div/span'
-    likes_span_element = _browser.find_element(By.XPATH, xpath_str)
-
-    if likes_span_element:
-        # Find the likes in the html <span> element
-        try:
-            likes_text = _browser.execute_script("return arguments[0].innerText", likes_span_element)
-            if likes_text:
-                try:
-                    number_likes = int(likes_text)
-                    logger.info(f'Found the likes element={number_likes}')
-                except ValueError:
-                    logger.error(f'Found likes text="{likes_text}" but that could not be converted to an integer')
-        except NoSuchElementException as e:
-            logger.info(f'Could not find the likes <span> element specified by XPATH={xpath_str}')
-
-    # Switch back to the main frame so that subsequent software not confused
-    _browser.switch_to.default_content()
-
-    # Could not determine number of likes
-    return number_likes
+    match post_type:
+        case PostType.XITTER:
+            return get_twitter_likes_str(_browser)
+        case PostType.BLUESKY:
+            return get_bluesky_likes_str(_browser)
+        case PostType.THREADS:
+            return get_threads_likes_str(_browser)
+        case _:
+            return ''
 
 
-def get_screenshot_for_html(url: str) -> tuple[Image, float, int | None, str | None]:
+def get_screenshot_for_html(url: str, post_type: PostType) -> tuple[Image, float, str, str | None]:
     """
     Loads specified URL into the browser, takes a screenshot of it as a PNG,
     and then returns a cropped version of the screenshot.
     The shrinkage is also returned so the caller can know how tiny the resulting text is and
     whether one want to include the post's text as part of the description in the Open Graph card.
     :param url: url of the file containing the html that describes the post. Can be on localhost.
-    :return: properly_sized_image, shrinkage, num_likes, post_text
+    :param post_type: whether XITTER, BLUESKY, or THREADS
+    :return: properly_sized_image, shrinkage, likes_str, post_text
     """
     logger.info(f'Loading headless browser using html in url={url}')
 
@@ -183,19 +156,19 @@ def get_screenshot_for_html(url: str) -> tuple[Image, float, int | None, str | N
     _wait_till_fully_loaded()
 
     # Determine how many likes there are
-    num_likes = _get_number_likes()
+    likes_str = _get_likes_str(post_type)
 
     # Determine post text in case want to display it via OpenGraph description
-    post_text = _get_post_text()
+    post_text = _get_post_text(post_type)
 
     # If want to make any modifications to the html, do so now
-    _make_modifications()
+    _make_modifications(post_type)
 
     # Take a screenshot of the url content
     screenshot = _get_screenshot()
 
     # Crop it to remove surrounding white space
-    rect = _determine_key_part_of_screenshot(screenshot)
+    rect = _determine_key_part_of_screenshot(screenshot, post_type)
     cropped_screenshot = screenshot.crop(rect)
     original_height = cropped_screenshot.height
 
@@ -206,7 +179,7 @@ def get_screenshot_for_html(url: str) -> tuple[Image, float, int | None, str | N
     properly_sized_image = _get_properly_sized_image(cropped_screenshot)
     return (properly_sized_image,
             properly_sized_image.height / original_height,
-            num_likes,
+            likes_str,
             post_text)
 
 
@@ -321,9 +294,26 @@ def _wait_till_fully_loaded() -> None:
         logger.info(f'Waiting for div element to be displayed...')
         wait = WebDriverWait(_browser, timeout=10)
         wait.until(lambda d: element.is_displayed())
-        logger.info(f'div element is now displayed...')
+        logger.info(f'div element is now displayed')
 
-        logger.info('The post is now fully loaded')
+        # For some systems it turns out that it can take a while to load in images.
+        # Therefore should wait for all of them to load for continuing and taking snapshot.
+        logger.info('Making sure all images displayed...')
+        image_elements = _browser.find_elements(By.TAG_NAME, 'img')
+        wait = WebDriverWait(_browser, timeout=5)
+        for image in image_elements:
+            # Wait until the DOM element is displayed
+            wait.until(lambda d: image.is_displayed())
+
+            # But really want to make sure that the image has actually been loaded, which is_displayed()
+            # does not indicate. Therefore execute javascript to determine if the html image element is "complete"
+            while True:
+                complete = _browser.execute_script("return arguments[0].complete", image)
+                if complete:
+                    break
+            logger.info(f'Current image now completely loaded')
+
+        logger.info('The post is now fully loaded, images and all')
     except NoSuchElementException as e:
         # There was no iframe as part of the post rendering so can't wait
         logger.error("No iframe used so page so cannot wait until loaded", e)
@@ -333,48 +323,26 @@ def _wait_till_fully_loaded() -> None:
         _browser.switch_to.default_content()
 
 
-def _determine_key_part_of_screenshot(screenshot) -> tuple[int, int, int, int]:
+def _determine_key_part_of_screenshot(screenshot: Image, post_type: PostType) -> tuple[int, int, int, int]:
     """
     Gets the rectangle of the important part of the post. Want to use the least amount of height
     possible since BlueSky uses fixed aspect ratio for Open Graph cards and if the post is too
     tall then the image is shrunk down too much. The units are in screen pixels
-    :param screenshot:
-    :return:left, top, right, bottom
+    :param screenshot: an Image to be trimmed
+    :param post_type: so different post types can be handled differently
+    :return:left, top, right, bottom, the coordinates of the important part of the image that should be kept
     """
     logger.info(f'Getting rectangle of important part of <article> tga...')
 
     ratio = _get_image_pixels_per_browser_pixel(screenshot)
     logger.info(f'Pixel ratio={ratio}')
 
-    # Determine the main <article> element
-    iframe = _browser.find_element(By.TAG_NAME, 'iframe')
-
-    # Determine left and right of the post. Adjusting left and right slightly to
-    # not include the border, since it is visually distracting.
-    iframe_rect = iframe.rect
-    left = iframe_rect['x'] * ratio + 2
-    right = left + (iframe_rect['width'] * ratio) - 4
-
-    _browser.switch_to.frame(iframe)
-    article = _browser.find_element(By.TAG_NAME, 'article')
-    if article:
-        # Use first div in the article to get the top position
-        div = article.find_element(By.TAG_NAME, 'div')
-        top = (iframe_rect['y'] + div.location['y']) * ratio - 6
-
-        # Use time element to can cut off the post there since time and remaining info not important
-        time = article.find_element(By.TAG_NAME, 'time')
-        if time:
-            bottom = (iframe_rect['y'] + time.location['y']) * ratio - 10
-        else:
-            bottom = top + (article.rect['height'] * ratio) - 4
-    else:
-        # No <article> element so use size of iframe
-        top = iframe_rect['y'] * ratio
-        bottom = top + (iframe_rect['height'] * ratio)
-
-    # Switch back to the main frame so that subsequent software not confused
-    _browser.switch_to.default_content()
-
-    logger.info(f'crop rect is left={left}, top={top}, right={right}, bottom={bottom}')
-    return round(left), round(top), round(right), round(bottom)
+    match post_type:
+        case PostType.XITTER:
+            return get_twitter_rect(ratio, _browser)
+        case PostType.BLUESKY:
+            return get_bluesky_rect(ratio, _browser)
+        case PostType.THREADS:
+            return get_threads_rect(ratio, _browser)
+        case _:
+            return 0, 0, screenshot.width, screenshot.height
