@@ -166,7 +166,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             f = open(filename, "w")
             f.write(html)
             f.close()
-            logger.info(f'For path={path} cached into file={filename} html=\n{html}')
         except FileNotFoundError as e:
             logger.error(f'Could not write cache file {filename} {str(e)}')
 
