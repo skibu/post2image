@@ -311,7 +311,7 @@ def _wait_till_fully_loaded() -> None:
                 complete = _browser.execute_script("return arguments[0].complete", image)
                 if complete:
                     break
-            logger.info(f'Current image now completely loaded')
+            logger.info(f'another one of the images now completely loaded')
 
         logger.info('The post is now fully loaded, images and all')
     except NoSuchElementException as e:
