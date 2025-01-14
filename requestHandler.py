@@ -197,11 +197,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         logger.info(f'Will be returning Open Graph card for path={path}')
 
         try:
-            # If cached card exists then return it
+            # If cached card exists and it is not older than configured amount then use it
             cached_card_html = self._get_card_from_cache(path)
             if cached_card_html:
-                logger.info(f'returning cached opengraph card html=\n{cached_card_html}')
-                return self._html_response(cached_card_html)
+                card_modified_time = os.path.getmtime(self._get_cache_filename(path))
+                current_time = time.time()
+                # If cache file not too old can use it
+                allowable_hours = config_values['allowable_cache_file_age_hours']
+                if current_time < card_modified_time + allowable_hours * 60 * 60:
+                    logger.info(f'returning cached opengraph card html=\n{cached_card_html}')
+                    return self._html_response(cached_card_html)
 
             # Cached card doesn't exist so create it
             # Get the html for rendering the post
