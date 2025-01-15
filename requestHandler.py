@@ -117,11 +117,23 @@ class RequestHandler(BaseHTTPRequestHandler):
         Sends back redirect to the original post path but using the original domain name.
         This way the user goes to the post when they click on the link.
         """
-        logger.info("Returning redirect to original post")
+        path = urlparse(self.path).path
+        post_type = self._get_post_type(path)
+        match post_type:
+            case PostType.XITTER:
+                domain_name = 'x.com'
+            case PostType.BLUESKY:
+                domain_name = 'bsky.app'
+            case PostType.THREADS:
+                domain_name = 'threads.net'
+            case _:
+                domain_name = 'x.com'
 
-        new_url = f'https://x.com{self.path}'
+        new_url = f'https://{domain_name}{self.path}'
+
+        logger.info(f"Returning redirect to original post {new_url}")
+
         msg = f'Redirecting to {new_url}'
-
         response_body = bytes(msg, 'utf-8')
         self.send_response(302)
         self.send_header('Location', new_url)
