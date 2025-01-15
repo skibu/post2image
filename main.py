@@ -1,4 +1,4 @@
-#
+#! /usr/bin/env python
 
 import requestHandler
 from config import init_config
