@@ -93,15 +93,15 @@ def get_threads_rect(ratio: float, browser: WebDriver):
     # Find the html element that contains the context
     main_container = browser.find_element(By.CLASS_NAME, 'OuterContainer')
     main_rect = main_container.rect
-    left = main_rect['x'] * ratio - 4
-    right = left + (main_rect['width'] * ratio) - 74
+    left = (main_rect['x'] - 2) * ratio
+    right = left + ((main_rect['width'] - 37) * ratio)
 
-    top = main_rect['y'] * ratio - 2
+    top = (main_rect['y'] - 1) * ratio
     action_bar_container = browser.find_element(By.CLASS_NAME, "ActionBarContainer")
     if action_bar_container:
-        bottom = top + action_bar_container.location['y'] * ratio - 32
+        bottom = top + (action_bar_container.location['y'] - 16) * ratio
     else:
-        bottom = top + (main_container['height'] * ratio) - 32
+        bottom = top + ((main_container['height'] - 16) * ratio)
 
     logger.info(f'Threads crop rect is left={left}, top={top}, right={right}, bottom={bottom}')
     return round(left), round(top), round(right), round(bottom)

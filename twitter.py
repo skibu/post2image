@@ -135,22 +135,22 @@ def get_twitter_rect(ratio: float, browser: WebDriver):
     # Determine left and right of the post. Adjusting left and right slightly to
     # not include the border, since it is visually distracting.
     iframe_rect = iframe.rect
-    left = iframe_rect['x'] * ratio + 2
-    right = left + (iframe_rect['width'] * ratio) - 4
+    left = (iframe_rect['x'] + 1) * ratio
+    right = left + ((iframe_rect['width'] -2) * ratio)
 
     browser.switch_to.frame(iframe)
     article = browser.find_element(By.TAG_NAME, 'article')
     if article:
         # Use first div in the article to get the top position
         div = article.find_element(By.TAG_NAME, 'div')
-        top = (iframe_rect['y'] + div.location['y']) * ratio - 6
+        top = (iframe_rect['y'] + div.location['y'] - 3) * ratio
 
         # Use time element to can cut off the post there since time and remaining info not important
         time = article.find_element(By.TAG_NAME, 'time')
         if time:
-            bottom = (iframe_rect['y'] + time.location['y']) * ratio - 10
+            bottom = (iframe_rect['y'] + time.location['y'] - 5) * ratio
         else:
-            bottom = top + (article.rect['height'] * ratio) - 4
+            bottom = top + ((article.rect['height'] - 2) * ratio)
     else:
         # No <article> element so use size of iframe
         top = iframe_rect['y'] * ratio

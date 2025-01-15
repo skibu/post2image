@@ -122,22 +122,22 @@ def get_bluesky_rect(ratio: float, browser: WebDriver):
     # Determine left and right of the post. Adjusting left and right slightly to
     # not include the border, since it is visually distracting.
     iframe_rect = iframe.rect
-    left = iframe_rect['x'] * ratio + 2
-    right = left + (iframe_rect['width'] * ratio) - 4
+    left = (iframe_rect['x'] + 1) * ratio
+    right = left + ((iframe_rect['width'] - 2) * ratio)
 
     browser.switch_to.frame(iframe)
 
     # Determine top
     top_bar = browser.find_element(By.XPATH, '//img/../..')
-    top = (iframe_rect['y'] + top_bar.rect['y']) * ratio - 4
+    top = (iframe_rect['y'] + top_bar.rect['y'] - 2) * ratio
 
     # Determine bottom by using the top of the <time> element
     time = browser.find_element(By.XPATH, '//time')
     if time:
-        bottom = (iframe_rect['y'] + time.rect['y']) * ratio - 14
+        bottom = (iframe_rect['y'] + time.rect['y'] - 7) * ratio
     else:
         # No <time> element so just use height of iframe
-        bottom = top + (iframe_rect['height'] * ratio) - 10
+        bottom = top + ((iframe_rect['height'] - 5) * ratio)
 
     # Switch back to the main frame so that subsequent software not confused
     browser.switch_to.default_content()
