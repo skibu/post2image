@@ -54,7 +54,18 @@ python3 -m pip install requests
 python3 -m pip install --upgrade selenium
 ```
 
-To run:
+## Running app
+First, from home directory, get the application from github: git clone https://github.com/skibu/post2image.git
+
+Then run it via either: `python3 post2image/main.py` or `post2image/main.py`
+
+## Auto startup
+Important consideration is to have the application start automatically at bootup. If using a Raspberry Pi one can simply modify the /etc/rc.local and add:
+
 ```
-python3 main.py
+# Start post2image, as user pi instead of root.
+# Note, when running the app, need to first cd into ones post2image
+# directory so that the config data file and the image and cache 
+# directories can be found
+sudo -H -u pi bash -c 'cd /home/pi/post2image/; /usr/bin/python3 main.py' &
 ```
