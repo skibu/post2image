@@ -239,7 +239,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             image_local_file_name = self._image_file_name(path)
             image_url = 'http://' + config_values['domain'] + '/' + image_local_file_name
             screenshot_image.save(image_local_file_name)
-            logger.info(f'Stored image in cache as file {image_local_file_name}')
+            logger.info(f'Stored image as file {image_local_file_name}')
 
             # Generate the title to display. Currently Bluesky will output a title no matter what, so might
             # as well make it useful. Bluesky also displays the domain name underneath. Therefore using
