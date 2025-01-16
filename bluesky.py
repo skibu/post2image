@@ -128,8 +128,8 @@ def get_bluesky_rect(ratio: float, browser: WebDriver):
 
     browser.switch_to.frame(iframe)
 
-    # Determine top
-    top_bar = browser.find_element(By.XPATH, '//img/../..')
+    # Determine top. Note: found using //img/../.. didn't work consistently
+    top_bar = browser.find_element(By.XPATH, '//img/..')
     top = (iframe_rect['y'] + top_bar.rect['y'] - 2) * ratio
 
     # Determine bottom by using the top of the <time> element
