@@ -201,12 +201,12 @@ def _get_properly_sized_image(img: Image) -> Image:
     if img_w / img_h < DESIRED_ASPECT_RATIO:
         # Image too tall so need a larger desired_w
         logger.info(f'For img_w={img_w} img_h={img_h} the image too tall')
-        desired_w = DESIRED_ASPECT_RATIO * img_h
+        desired_w = round(DESIRED_ASPECT_RATIO * img_h)
         desired_h = img_h
     else:
         # Image too wide so need a larger desired_h
         logger.info(f'For img_w={img_w} img_h={img_h} the image too wide')
-        desired_h = img_w / DESIRED_ASPECT_RATIO
+        desired_h = round(img_w / DESIRED_ASPECT_RATIO)
         desired_w = img_w
     logger.info(f'Using desired_w={desired_w} and desired_h={desired_h}')
 
