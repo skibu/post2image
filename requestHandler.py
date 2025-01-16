@@ -216,8 +216,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                 # If cache file not too old can use it
                 allowable_hours = int(config_values['allowable_cache_file_age_hours'])
                 if current_time < card_modified_time + allowable_hours * 60 * 60:
-                    logger.info(f'returning cached opengraph card html=\n{cached_card_html}')
+                    logger.info(f'Returning cached opengraph card html=\n{cached_card_html}')
                     return self._html_response(cached_card_html)
+                else:
+                    logger.info(f'OpenGraph card was in cach but was too old to use. Therefore regenerating...')
 
             # Cached card doesn't exist so create it
             # Get the html for rendering the post
