@@ -332,7 +332,7 @@ def _determine_key_part_of_screenshot(screenshot: Image, post_type: PostType) ->
     :param post_type: so different post types can be handled differently
     :return:left, top, right, bottom, the coordinates of the important part of the image that should be kept
     """
-    logger.info(f'Getting rectangle of important part of <article> tga...')
+    logger.info(f'Getting rectangle of important part of <article> tag...')
 
     ratio = _get_image_pixels_per_browser_pixel(screenshot)
     logger.info(f'Pixel ratio={ratio}')
