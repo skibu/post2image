@@ -162,7 +162,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             f = open(filename, "r")
             html = f.read()
             f.close()
-            logger.info(f'For path={path} using cache file={filename} html=\n{html}')
+            logger.info(f'For path={path} using cache file={filename}')
             return html
         except FileNotFoundError as e:
             # No cache file that could be opened
