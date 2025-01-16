@@ -136,6 +136,8 @@ def get_bluesky_rect(ratio: float, browser: WebDriver):
     time_element = browser.find_element(By.XPATH, '//time')
     if time_element:
         bottom = (iframe_rect['y'] + time_element.rect['y'] - 7) * ratio
+        logging.info(f"For Bluesky post <time> element found. time_element.rect['y']={time_element.rect['y']} "
+                     f"and bottom={bottom}")
     else:
         # No <time> element so just use height of iframe
         logging.info(f'<time> element not found so using all of frame')
