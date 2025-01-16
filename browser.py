@@ -173,8 +173,8 @@ def get_screenshot_for_html(url: str, post_type: PostType) -> tuple[Image, float
     original_height = cropped_screenshot.height
 
     # FIXME For debugging save the images
-    screenshot.save('tmp/image.png')
-    cropped_screenshot.save('tmp/cropped.png')
+    screenshot.save('images/debug_orig_image.png')
+    cropped_screenshot.save('images/debug_cropped_image.png')
 
     properly_sized_image = _get_properly_sized_image(cropped_screenshot)
     return (properly_sized_image,
