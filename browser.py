@@ -170,7 +170,6 @@ def get_screenshot_for_html(url: str, post_type: PostType) -> tuple[Image, float
     # Crop it to remove surrounding white space
     rect = _determine_key_part_of_screenshot(screenshot, post_type)
     cropped_screenshot = screenshot.crop(rect)
-    original_height = cropped_screenshot.height
 
     # FIXME For debugging save the images
     screenshot.save('images/debug_orig_image.png')
@@ -178,7 +177,7 @@ def get_screenshot_for_html(url: str, post_type: PostType) -> tuple[Image, float
 
     properly_sized_image = _get_properly_sized_image(cropped_screenshot)
     return (properly_sized_image,
-            properly_sized_image.height / original_height,
+            properly_sized_image.height / cropped_screenshot.height,
             likes_str,
             post_text)
 
@@ -189,35 +188,57 @@ def _get_properly_sized_image(img: Image) -> Image:
     aspect ratio. This can cause Bluesky in particular to display image with clipped off top and
     bottom if the image to aspect ratio is too tall. And it can cut off the left and right sides
     if aspect ratio is too wide. Therefore want to have the resulting image have the proper Bluesky
-    aspect ratio, and to do that can simply use the desired width of 1200 and desired height of 630.
+    aspect ratio, and to do that can simply use the ratio of width of 1200 and  height of 630 for
+    a ratio of 1200/630 = 1.9
     :param img: the image of the post
     :return: the image, but with width of 1200 and height of 630
     """
-    desired_w = 1200
-    desired_h = 630
+    DESIRED_ASPECT_RATIO = 1.9  # width / height
     img_w, img_h = img.size
 
-    # Shrink the image so that height is at limit of desired_h. Assuming that
-    # width will always be less than desired_w so not concerned about width.
-    if img_h > desired_h:
-        shrunken_size = round(img_w * (desired_h / img_h)), desired_h
+    # Determine desired width and height of the final image such that the cropped
+    # image fits in it and it has the desired aspect ratio of 1.9
+    if img_w / img_h < DESIRED_ASPECT_RATIO:
+        # Image too tall so need a larger desired_w
+        logger.info(f'For img_w={img_w} img_h={img_h} the image too tall')
+        desired_w = DESIRED_ASPECT_RATIO * img_h
+        desired_h = img_h
+    else:
+        # Image too wide so need a larger desired_h
+        logger.info(f'For img_w={img_w} img_h={img_h} the image too wide')
+        desired_h = img_w / DESIRED_ASPECT_RATIO
+        desired_w = img_w
+    logger.info(f'Using desired_w={desired_w} and desired_h={desired_h}')
+
+    # If image too large then shrink it down in case the site crops large images even if
+    # they have proper aspect ratio
+    if desired_w > 1200:
+        desired_w = 1200
+        desired_h = 630
+        logging.info(f'Since desired_w was greater than 1200 setting desired_w={desired_w} desired_h={desired_h}')
+
+    # If image too large then shrink it down to max of width 1200 and height of 630
+    if img_w > desired_w or img_h > desired_h:
+        shrinkage = min(desired_w / img_w, desired_h / img_h)
+        shrunken_size = round(shrinkage * img_w), round(shrinkage * img_h)
         img.thumbnail(shrunken_size, Image.Resampling.LANCZOS)
         img_w, img_h = img.size
+        logging.info(f'Shrunk image so it is now img_w={img_w} img_h={img_h}')
 
     # Create background semi-transparent image that is desired size and the right color.
     # Using values of 31 and transparency of 230 so that in Bluesky the background will
     # simply blend in with the post. Originally thought wanted a low transparency but it
     # turns out thee Bluesky background color is darker than want.
-    proper_img = Image.new(mode="RGBA",
-                           size=(desired_w, desired_h),
-                           color=(31, 31, 31, 230))
+    img_of_proper_size = Image.new(mode="RGBA",
+                                   size=(desired_w, desired_h),
+                                   color=(31, 31, 31, 230))
 
     # Write the shrunken image onto center of the transparent background
     centering_offset = ((desired_w - img_w) // 2, (desired_h - img_h) // 2)
-    proper_img.paste(img, centering_offset)
+    img_of_proper_size.paste(img, centering_offset)
 
     # Return the shrunken image with transparent sides
-    return proper_img
+    return img_of_proper_size
 
 
 def _load_url(url) -> None:
