@@ -1,6 +1,7 @@
 # For handling twitter requests
 import json
 import logging
+from time import sleep
 
 import requests
 from selenium.common import NoSuchElementException
@@ -132,11 +133,15 @@ def get_bluesky_rect(ratio: float, browser: WebDriver):
     top = (iframe_rect['y'] + top_bar.rect['y'] - 2) * ratio
 
     # Determine bottom by using the top of the <time> element
-    time = browser.find_element(By.XPATH, '//time')
-    if time:
-        bottom = (iframe_rect['y'] + time.rect['y'] - 7) * ratio
+    time_element = browser.find_element(By.XPATH, '//time')
+    if time_element:
+        bottom = (iframe_rect['y'] + time_element.rect['y'] - 7) * ratio
     else:
         # No <time> element so just use height of iframe
+        logging.info(f'<time> element not found so using all of frame')
+        sleep(1.0)
+        time_element = browser.find_element(By.XPATH, '//time')
+        logging.info(f'time_element={time_element}')
         bottom = top + ((iframe_rect['height'] - 5) * ratio)
 
     # Switch back to the main frame so that subsequent software not confused
