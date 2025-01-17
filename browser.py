@@ -321,7 +321,7 @@ def _wait_till_fully_loaded() -> None:
         # Therefore should wait for all of them to load for continuing and taking snapshot.
         logger.info('Making sure all images displayed...')
         image_elements = _browser.find_elements(By.TAG_NAME, 'img')
-        wait = WebDriverWait(_browser, timeout=5)
+        wait = WebDriverWait(_browser, timeout=10)
         for image in image_elements:
             # Wait until the DOM element is displayed
             wait.until(lambda d: image.is_displayed())
