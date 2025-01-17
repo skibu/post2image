@@ -1,5 +1,6 @@
 # For using Chrome browser to convert complicated html to an image
 import logging
+import time
 from io import BytesIO
 from typing import Optional
 
@@ -35,7 +36,7 @@ def _browser_init() -> None:
     # to get rid of warning message at top of page
     options.add_experimental_option("excludeSwitches", ['enable-automation']);
     # To run without actual displaying browser window
-    options.add_argument('--headless=new')
+    # options.add_argument('--headless=new')
 
     # If chrome_web_browser specified then use it. Otherwise uses selenium default value
     if config_values['chrome_web_browser']:
@@ -312,27 +313,26 @@ def _wait_till_fully_loaded() -> None:
         logger.info(f'Found a div html element within the iframe. DOM id= {element.get_dom_attribute("id")}')
 
         # Wait until the element has actually been displayed
-        logger.info(f'Waiting for div element to be displayed...')
         wait = WebDriverWait(_browser, timeout=10)
         wait.until(lambda d: element.is_displayed())
-        logger.info(f'div element is now displayed')
+        logger.info(f'A div element within the iframe is now displayed')
 
         # For some systems it turns out that it can take a while to load in images.
         # Therefore should wait for all of them to load for continuing and taking snapshot.
-        logger.info('Making sure all images displayed...')
+        logger.info('Making sure all images fully loaded and displayed...')
         image_elements = _browser.find_elements(By.TAG_NAME, 'img')
-        wait = WebDriverWait(_browser, timeout=10)
+        start = time.time()
         for image in image_elements:
-            # Wait until the DOM element is displayed
-            wait.until(lambda d: image.is_displayed())
-
-            # But really want to make sure that the image has actually been loaded, which is_displayed()
-            # does not indicate. Therefore execute javascript to determine if the html image element is "complete"
-            while True:
+            # Wait till image has actually been loaded, which by executing
+            # javascript to determine if the html image element is "complete".
+            # But only wait at most 6 seconds.
+            while time.time() - start < 6.0:
                 complete = _browser.execute_script("return arguments[0].complete", image)
                 if complete:
                     break
-            logger.info(f'another one of the images now completely loaded')
+                # Sleep a bit before trying again so don't use up all CPU
+                time.sleep(0.1)
+            logger.info(f'Another one of the images now completely loaded')
 
         logger.info('The post is now fully loaded, images and all')
     except NoSuchElementException as e:
