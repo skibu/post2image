@@ -310,8 +310,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             except FileExistsError:
                 logger.info(f'NOTE: temp file {self._temp_html_file_name} already exists so waiting for '
                             f'it to disappear, or for 10 secs...')
-                time.sleep(2.0)  # FIXME time.sleep(0.1)
-                if time.time() - start > 10.0:
+                time.sleep(2.0)
+                if time.time() - start > 20.0:
                     f = open(self._temp_html_file_name, "w")
 
         f.write(html)
