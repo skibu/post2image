@@ -5,6 +5,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler
 from http.server import ThreadingHTTPServer
+import ssl
 import re
 from io import BytesIO
 from urllib.parse import urlparse
@@ -30,14 +31,6 @@ logger_bad_requests.propagate = False
 _first_time = True
 
 
-def start_webserver():
-    """Starts the webserver and then just waits forever"""
-    server = ThreadingHTTPServer(('', config_values['http_port']), RequestHandler)
-
-    # Respond to requests until process is killed
-    server.serve_forever()
-
-
 # noinspection PyMethodMayBeStatic
 class RequestHandler(BaseHTTPRequestHandler):
     _temp_html_file_name = 'tmp/post.html'
@@ -54,6 +47,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             _first_time = False
 
         logger.info(f'================ Handling request for path={self.path} ================')
+
+        # If no path specified then redirect to the readme page
+        if self.path == '/':
+            logger.info(f"No path specified so redirecting to page {config_values['readme_url']}")
+            self._return_redirect(config_values['readme_url'])
+            return
 
         # If getting image from cache, do so...
         if self.path.startswith('/' + self._images_directory):
@@ -130,9 +129,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                 domain_name = 'x.com'
 
         new_url = f'https://{domain_name}{self.path}'
-
         logger.info(f"Returning redirect to original post {new_url}")
+        self._return_redirect(new_url)
 
+    def _return_redirect(self, new_url: str) -> None:
         msg = f'Redirecting to {new_url}'
         response_body = bytes(msg, 'utf-8')
         self.send_response(302)
@@ -470,3 +470,39 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(response_body)))
         self.end_headers()
         self.wfile.write(response_body)
+
+
+def _run() -> None:
+    """
+    Handles http requests
+    """
+    httpd = ThreadingHTTPServer(('', config_values['http_port']), RequestHandler)
+    httpd.serve_forever()
+
+
+def _run_ssl() -> None:
+    """
+    Sets up Handling of https requests
+    """
+    httpd = ThreadingHTTPServer(('', config_values['https_port']), RequestHandler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context.load_cert_chain(config_values['certfile'], config_values['keyfile'])
+    context.set_ciphers("@SECLEVEL=1:ALL")
+    httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+
+    httpd.serve_forever()
+
+
+def start_webserver() -> None:
+    """
+    Starts the webserver and then just waits forever. Handles both http and https.
+    """
+    import threading
+    http_thread = threading.Thread(target=_run)
+    https_thread = threading.Thread(target=_run_ssl)
+
+    http_thread.start()
+    https_thread.start()
+
+    http_thread.join()
+    https_thread.join()
