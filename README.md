@@ -11,6 +11,8 @@ Xrosspost.com simply makes it nice and easy to crosspost Tweet images on Bluesky
 
 You can get the link for a Tweet by clicking on its adjacent share button on the lower right side of the Tweet and clicking on "Copy link". Then in Bluesky start to create a new Bluesky post and past in the URL (e.g. https://x.com/skibuSmith/status/1861280658573725949). Bluesky will automatically create the ugly version of the link. No problem! Delete the ugly link by clicking on the "X" delete button. Then edit the link so that instead of referring to "x.com" it instead points to "xrosspost.com" just by adding the characters "rosspost" in the right place. The new image version of the crosspost will then appear. If the image for the post isn't automatically generated then move the pointer to the end of the URL and add a space. This should nudge Bluesky into generating the image. Then finish up your Bluesky post and you are all done. 
 
+# Technical Details
+For those who want to know how this all works behind the scenes...
 
 ## Post2Image
 The Post2Image GitHub repository is [here](https://github.com/skibu/post2image)
