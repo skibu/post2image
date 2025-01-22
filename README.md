@@ -1,4 +1,19 @@
-# Post2Image
+# Xrosspost.com 
+Welcome to Xrosspost.com, a tool for easily crossposting tweets from Xitter to Bluesky. This is convenient for folks who want to migrate from Xitter to Bluesky, yet still want to show others some choice toxic tweets, yet without the user actually going to Xitter and supporting ads on that system.
+
+Xrosspost.com also works for Threads as well, which is nice since Threads has recently gone fully toxic, too.
+
+Normally if you add a URL of a Tweet (e.g. https://x.com/skibuSmith/status/1861280658573725949) to a Bluesky post the viewers will just see the ugly URL and not an image of the actual tweet. This is because Space Karen Leon Musk broke Twitter intentionally to try to keep users on the hellsite by making crossposts problematic. Some people have resorted to taking screen shots of a tweet and posting that image. That of course is a nuisance. Plus one then doesn't provide a link back to the original Tweet to show that it really was posted and is not just some photoshopped image.
+
+Xrosspost.com simply makes it nice and easy to crosspost Tweet images on Bluesky (and Threads too)
+
+# How to use
+
+You can get the link for a Tweet by clicking on its adjacent share button on the lower right side of the Tweet and clicking on "Copy link". Then in Bluesky start to create a new Bluesky post and past in the URL (e.g. https://x.com/skibuSmith/status/1861280658573725949). Bluesky will automatically create the ugly version of the link. No problem! Delete the ugly link by clicking on the "X" delete button. Then edit the link so that instead of referring to "x.com" it instead points to "xrosspost.com" just by adding the characters "rosspost" in the right place. The new image version of the crosspost will then appear. If the image for the post isn't automatically generated then move the pointer to the end of the URL and add a space. This should nudge Bluesky into generating the image. Then finish up your Bluesky post and you are all done. 
+
+
+## Post2Image
+The Post2Image GitHub repository is [here](https://github.com/skibu/post2image)
 
 post2image takes in a URL for a social media post and returns an Open Graph card that points to an image of the post. 
 
